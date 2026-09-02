@@ -1,11 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useFieldArray, useForm, useWatch, type Control, type FieldErrors, type UseFormRegister } from "react-hook-form";
+import { Controller, useFieldArray, useForm, useWatch, type Control, type FieldErrors, type UseFormRegister } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import { Modal, Button, FormField, Input, Textarea, Select } from "@/components/ui";
+import { Modal, Button, Checkbox, FormField, Input, Textarea, Select } from "@/components/ui";
 import { eventTypeFormSchema, type EventTypeFormInput, type EventTypeFormValues } from "@/lib/validations/eventType";
 import { createEventType, updateEventType } from "@/lib/api/eventTypes";
 import type { EventType } from "@/types/models";
@@ -61,15 +61,27 @@ function QuestionRow({
         <div className="flex-1 space-y-2">
           <Input placeholder="Question text" error={!!questionErrors?.label} {...register(`custom_questions.${index}.label` as const)} />
           <div className="flex items-center gap-2">
-            <Select className="w-auto" {...register(`custom_questions.${index}.type` as const)}>
-              <option value="text">Short text</option>
-              <option value="textarea">Long text</option>
-              <option value="select">Dropdown</option>
-            </Select>
-            <label className="flex items-center gap-1.5 text-xs text-neutral-500">
-              <input type="checkbox" {...register(`custom_questions.${index}.required` as const)} />
-              Required
-            </label>
+            <Controller
+              control={control}
+              name={`custom_questions.${index}.type` as const}
+              render={({ field }) => (
+                <Select
+                  className="w-36"
+                  value={field.value}
+                  onChange={field.onChange}
+                  options={[
+                    { value: "text", label: "Short text" },
+                    { value: "textarea", label: "Long text" },
+                    { value: "select", label: "Dropdown" },
+                  ]}
+                />
+              )}
+            />
+            <Controller
+              control={control}
+              name={`custom_questions.${index}.required` as const}
+              render={({ field }) => <Checkbox checked={field.value} onChange={field.onChange} label="Required" />}
+            />
           </div>
           {type === "select" && (
             <FormField

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { Pencil, Trash2 } from "lucide-react";
 import { ActionsMenu, Badge, Card, Switch } from "@/components/ui";
 import type { EventType } from "@/types/models";
@@ -44,9 +45,13 @@ export function EventTypesList({
               {eventType.description && (
                 <p className="mt-1.5 line-clamp-2 text-sm text-neutral-500">{eventType.description}</p>
               )}
-              <p className="mt-1.5 truncate text-xs text-neutral-400">
+              <Link
+                href={`/book/${adminSlug}/${eventType.slug}`}
+                target="_blank"
+                className="mt-1.5 block truncate text-xs text-brand-600 hover:underline"
+              >
                 /book/{adminSlug}/{eventType.slug}
-              </p>
+              </Link>
             </div>
             <div className="flex shrink-0 items-center gap-3">
               <Switch

@@ -13,7 +13,19 @@ Every screen and component must work at mobile widths (~375px), tablet (~768px),
 - The app shell (`AppShell.tsx`) already handles the sidebar → mobile drawer pattern — don't rebuild navigation per-section, extend `nav-config.tsx` instead.
 - Headers use `PageHeader` (already responsive: stacks title/actions on narrow screens) — reuse it, don't hand-roll new page headers.
 
-## 2. Edge cases to check after every functionality change
+## 2. No native browser/OS UI — this is a firm, standing rule
+
+The user has stated this repeatedly and explicitly: **no default browser or OS-rendered UI, anywhere, ever** — everything must be custom-built to match the app's own theme. This isn't a one-off preference for a single field, it applies to every control in the app, present and future.
+
+Why this can't be "fixed" by just adding CSS: a native `<input type="time">`'s popup, a native `<input type="date">`'s calendar, and a native `<select>`'s open option list are all rendered by the browser/OS itself, entirely outside the page's DOM — no amount of CSS can restyle them (not a skill gap, a real technical wall every website hits). The only way to get full control is to build the control's entire open/interactive state ourselves.
+
+- **Time input**: `TimeInput` (`src/components/ui/TimeInput.tsx`) — custom hour/minute/AM-PM columns in a portal popover, brand-colored selection, our fonts/borders throughout.
+- **Date input**: `DatePicker` (`src/components/ui/DatePicker.tsx`) — custom month-grid calendar popover, same treatment.
+- **Dropdown/select**: prefer a portal-based custom listbox (see `ActionsMenu.tsx`'s pattern) over a native `<select>` when a new one is needed. If a call site currently uses the native-backed `Select.tsx`, be aware that its open list is native/unstyleable — replacing it is in scope whenever it's touched, even if not explicitly requested.
+- Before adding ANY new native form control (checkbox, radio, range, color, file, etc.), check whether it needs the same treatment — assume yes unless told otherwise.
+- Known past bug in this pattern: a portal popover's own opening behavior (e.g. auto-`scrollIntoView`) can fire a native `scroll` event that a naive "close on scroll" listener mistakes for the user scrolling the page — always check `e.target` is outside the popover before closing (see `TimeInput.tsx`'s `handleWindowScroll`).
+
+## 3. Edge cases to check after every functionality change
 
 Not exhaustive, but the standing checklist before calling a feature "done":
 
@@ -26,7 +38,7 @@ Not exhaustive, but the standing checklist before calling a feature "done":
 - **Long content**: names/descriptions that are very long — do they truncate/wrap instead of breaking layout?
 - **Portal/dropdown/modal interactions**: does closing-on-outside-click still allow clicking the menu/modal's own contents? (Known past bug — see `ActionsMenu.tsx`.)
 
-## 3. Quick regression pass (run after any change, not just in the area you touched)
+## 4. Quick regression pass (run after any change, not just in the area you touched)
 
 Because features share the auth/layout foundation, a change in one area can silently break another. After any change, spot-check:
 
@@ -37,9 +49,9 @@ Because features share the auth/layout foundation, a change in one area can sile
 5. **Responsive check** — resize to ~375px width on at least the page you changed and one you didn't, confirm nothing overflows/clips.
 6. **Build check** — `npm run lint` and `npm run build` both pass clean before considering a change finished.
 
-## 4. Where things live (avoid duplicating)
+## 5. Where things live (avoid duplicating)
 
-- Reusable primitives: `src/components/ui/` (Button, Input, Modal, ActionsMenu, Switch, etc.) — check here before writing a new one-off.
+- Reusable primitives: `src/components/ui/` (Button, Input, Select, Modal, ActionsMenu, Switch, TimeInput, DatePicker, etc.) — check here before writing a new one-off.
 - Layout shell: `src/components/layout/` (AppShell, PageHeader, nav-config).
 - Per-domain API calls: `src/lib/api/` (one file per resource, e.g. `admins.ts`, `eventTypes.ts`) — plain Supabase client calls, RLS does the authorization.
 - Validation schemas: `src/lib/validations/`.

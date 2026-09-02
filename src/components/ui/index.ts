@@ -11,3 +11,6 @@ export * from "./Spinner";
 export * from "./Modal";
 export * from "./ActionsMenu";
 export * from "./Switch";
+export * from "./Checkbox";
+export * from "./TimeInput";
+export * from "./DatePicker";

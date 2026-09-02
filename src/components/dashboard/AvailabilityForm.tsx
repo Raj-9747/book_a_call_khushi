@@ -1,10 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { Controller, useForm, useWatch, type Control, type FieldErrors, type UseFormRegister } from "react-hook-form";
+import { Controller, useForm, useWatch, type Control, type FieldErrors } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
-import { Button, Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription, Input, Switch } from "@/components/ui";
+import { Button, Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription, Switch, TimeInput } from "@/components/ui";
 import {
   availabilityFormSchema,
   normalizeAvailability,
@@ -27,12 +27,10 @@ const DAY_LABELS: Record<Weekday, string> = {
 function DayRow({
   day,
   control,
-  register,
   errors,
 }: {
   day: Weekday;
   control: Control<AvailabilityFormValues>;
-  register: UseFormRegister<AvailabilityFormValues>;
   errors: FieldErrors<AvailabilityFormValues>;
 }) {
   const enabled = useWatch({ control, name: `${day}.enabled` });
@@ -49,9 +47,17 @@ function DayRow({
         <span className="text-sm font-medium text-neutral-700">{DAY_LABELS[day]}</span>
       </div>
       <div className="flex flex-1 items-center gap-2">
-        <Input type="time" className="w-32" disabled={!enabled} {...register(`${day}.start`)} />
+        <Controller
+          control={control}
+          name={`${day}.start`}
+          render={({ field }) => <TimeInput className="w-28 sm:w-36" value={field.value} onChange={field.onChange} disabled={!enabled} />}
+        />
         <span className="text-sm text-neutral-400">to</span>
-        <Input type="time" className="w-32" disabled={!enabled} {...register(`${day}.end`)} />
+        <Controller
+          control={control}
+          name={`${day}.end`}
+          render={({ field }) => <TimeInput className="w-28 sm:w-36" value={field.value} onChange={field.onChange} disabled={!enabled} />}
+        />
       </div>
       {dayErrors?.end && <p className="w-full text-xs text-danger-500 sm:w-auto">{dayErrors.end.message}</p>}
     </div>
@@ -71,7 +77,6 @@ export function AvailabilityForm({
 
   const {
     control,
-    register,
     handleSubmit,
     formState: { errors, isDirty },
     reset,
@@ -104,7 +109,7 @@ export function AvailabilityForm({
       <form onSubmit={handleSubmit(onSubmit)} noValidate>
         <CardContent className="space-y-1">
           {WEEKDAYS.map((day) => (
-            <DayRow key={day} day={day} control={control} register={register} errors={errors} />
+            <DayRow key={day} day={day} control={control} errors={errors} />
           ))}
         </CardContent>
         <CardFooter>
