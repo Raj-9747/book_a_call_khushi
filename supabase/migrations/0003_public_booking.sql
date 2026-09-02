@@ -106,14 +106,14 @@ declare
   v_conflict_count integer;
   v_booking_id uuid;
 begin
-  select * into v_admin from admins where id = p_admin_id and is_active = true;
+  select * into v_admin from admins a where a.id = p_admin_id and a.is_active = true;
   if not found then
     raise exception 'This booking page is not available.';
   end if;
 
   select * into v_event_type
-  from event_types
-  where id = p_event_type_id and admin_id = p_admin_id and is_active = true;
+  from event_types et
+  where et.id = p_event_type_id and et.admin_id = p_admin_id and et.is_active = true;
   if not found then
     raise exception 'This event type is no longer available.';
   end if;
@@ -126,17 +126,24 @@ begin
   v_payment_status := case when v_event_type.price > 0 then 'paid_dummy' else 'free' end;
 
   -- Re-check for conflicts at insert time (not just when the client loaded
-  -- the page) to prevent two people double-booking the same slot.
+  -- the page) to prevent two people double-booking the same slot. Every
+  -- column reference here is table-aliased and qualified — `id`,
+  -- `start_time`, `end_time`, and `status` are ALSO the names of this
+  -- function's own RETURNS TABLE output parameters, which PL/pgSQL treats
+  -- as in-scope variables, so any bare column reference matching one of
+  -- those names is ambiguous (42702) rather than obviously the table column.
   select count(*) into v_conflict_count
   from (
-    select start_time, end_time from bookings
-    where admin_id = p_admin_id
-      and status in ('pending_confirmation', 'confirmed')
-      and start_time < v_end_time and end_time > p_start_time
+    select b.start_time as conflict_start, b.end_time as conflict_end
+    from bookings b
+    where b.admin_id = p_admin_id
+      and b.status in ('pending_confirmation', 'confirmed')
+      and b.start_time < v_end_time and b.end_time > p_start_time
     union all
-    select start_time, end_time from blocked_slots
-    where admin_id = p_admin_id
-      and start_time < v_end_time and end_time > p_start_time
+    select bs.start_time as conflict_start, bs.end_time as conflict_end
+    from blocked_slots bs
+    where bs.admin_id = p_admin_id
+      and bs.start_time < v_end_time and bs.end_time > p_start_time
   ) conflicts;
 
   if v_conflict_count > 0 then
@@ -155,8 +162,9 @@ begin
   returning bookings.id into v_booking_id;
 
   return query
-    select bookings.id, bookings.start_time, bookings.end_time, bookings.status
-    from bookings where bookings.id = v_booking_id;
+    select b.id, b.start_time, b.end_time, b.status
+    from bookings b
+    where b.id = v_booking_id;
 end;
 $$;
 

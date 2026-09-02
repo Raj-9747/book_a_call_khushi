@@ -37,6 +37,7 @@ Not exhaustive, but the standing checklist before calling a feature "done":
 - **Destructive actions**: is there a confirmation before delete/remove? Does delete correctly cascade or correctly *not* cascade where it shouldn't (e.g. event types with existing bookings)?
 - **Long content**: names/descriptions that are very long — do they truncate/wrap instead of breaking layout?
 - **Portal/dropdown/modal interactions**: does closing-on-outside-click still allow clicking the menu/modal's own contents? (Known past bug — see `ActionsMenu.tsx`.)
+- **PL/pgSQL functions with `RETURNS TABLE`**: every name in `RETURNS TABLE (id, start_time, ...)` becomes an implicit variable in scope for the whole function body — a bare column reference matching one of those names (e.g. `where id = ...`) is ambiguous (Postgres error `42702`) between that variable and the actual table column, even when it looks obviously like "the table column" to a reader. Always alias every table in the function (`from bookings b`) and qualify every column (`b.id`, `b.start_time`) rather than relying on bare names. (Known past bug — see `create_public_booking` in `0003_public_booking.sql` / the fix in `0004_fix_create_public_booking_ambiguity.sql`.) Test any such function with an actual RPC call, not just by reading the SQL — this class of bug passes a syntax check but fails at call time.
 
 ## 4. Quick regression pass (run after any change, not just in the area you touched)
 

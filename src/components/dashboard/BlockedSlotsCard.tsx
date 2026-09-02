@@ -47,12 +47,12 @@ export function BlockedSlotsCard({ adminId }: { adminId: string }) {
 
   return (
     <Card>
-      <CardHeader className="flex flex-row items-center justify-between gap-3">
+      <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <CardTitle>Blocked time</CardTitle>
           <CardDescription>Days or windows you&apos;re unavailable, on top of your weekly schedule.</CardDescription>
         </div>
-        <Button size="sm" onClick={() => setModalOpen(true)}>
+        <Button size="sm" className="shrink-0 self-start whitespace-nowrap sm:self-auto" onClick={() => setModalOpen(true)}>
           <Plus className="h-3.5 w-3.5" /> Block time
         </Button>
       </CardHeader>
