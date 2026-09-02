@@ -9,6 +9,7 @@ export interface Admin {
   is_active: boolean;
   timezone: string;
   google_calendar_connected: boolean;
+  weekly_availability?: unknown;
   created_at: string;
 }
 

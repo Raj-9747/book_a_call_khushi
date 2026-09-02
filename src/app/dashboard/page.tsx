@@ -9,7 +9,7 @@ export default async function DashboardOverviewPage() {
   return (
     <>
       <PageHeader title={`Welcome, ${admin?.name.split(" ")[0]}`} description="Here's your Zaptly overview" />
-      <div className="space-y-4 p-8">
+      <div className="space-y-4 p-4 sm:p-8">
         {!admin?.google_calendar_connected && (
           <Card className="border-brand-200 bg-brand-50">
             <CardContent className="flex items-center gap-3">

@@ -31,7 +31,7 @@ export default function ManageAdminsPage() {
           </Button>
         }
       />
-      <div className="p-8">
+      <div className="p-4 sm:p-8">
         {admins === null ? (
           <div className="flex justify-center py-16">
             <Spinner className="h-6 w-6 text-neutral-400" />

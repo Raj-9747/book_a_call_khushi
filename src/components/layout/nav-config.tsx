@@ -1,4 +1,4 @@
-import { type LucideIcon, LayoutDashboard, Settings, Users } from "lucide-react";
+import { type LucideIcon, Clock, LayoutDashboard, ListChecks, Settings, Users } from "lucide-react";
 
 export interface NavItem {
   label: string;
@@ -16,6 +16,8 @@ export const NAV_ITEMS_BY_SECTION = {
   ] satisfies NavItem[],
   dashboard: [
     { label: "Overview", href: "/dashboard", icon: LayoutDashboard },
+    { label: "Event types", href: "/dashboard/event-types", icon: ListChecks },
+    { label: "Availability", href: "/dashboard/availability", icon: Clock },
     { label: "Settings", href: "/dashboard/settings", icon: Settings },
   ] satisfies NavItem[],
 } as const;

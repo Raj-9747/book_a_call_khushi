@@ -58,7 +58,8 @@ export function AdminsTable({
 
   return (
     <div className="overflow-hidden rounded-xl border border-border bg-surface">
-      <table className="w-full text-sm">
+      <div className="overflow-x-auto">
+      <table className="w-full min-w-[720px] text-sm">
         <thead>
           <tr className="border-b border-border bg-neutral-50 text-left text-xs font-medium uppercase tracking-wide text-neutral-500">
             <th className="px-6 py-3">Admin</th>
@@ -119,6 +120,7 @@ export function AdminsTable({
           ))}
         </tbody>
       </table>
+      </div>
       <EditAdminModal
         admin={editingAdmin}
         onClose={() => setEditingAdmin(null)}

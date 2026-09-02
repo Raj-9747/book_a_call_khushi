@@ -5,7 +5,7 @@ export default function DashboardSettingsPage() {
   return (
     <>
       <PageHeader title="Settings" description="Manage your account" />
-      <div className="max-w-lg p-8">
+      <div className="max-w-lg p-4 sm:p-8">
         <ChangePasswordForm />
       </div>
     </>
