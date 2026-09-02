@@ -9,18 +9,23 @@
 // Required secrets: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, SUPABASE_ANON_KEY
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
+import { corsHeaders, jsonResponse } from "../_shared/cors.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
 Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response(null, { headers: corsHeaders });
+  }
+
   if (req.method !== "POST") {
-    return new Response(JSON.stringify({ error: "Method not allowed" }), { status: 405 });
+    return jsonResponse({ error: "Method not allowed" }, 405);
   }
 
   const authHeader = req.headers.get("Authorization");
   if (!authHeader) {
-    return new Response(JSON.stringify({ error: "Missing Authorization header" }), { status: 401 });
+    return jsonResponse({ error: "Missing Authorization header" }, 401);
   }
 
   const callerClient = createClient(SUPABASE_URL, Deno.env.get("SUPABASE_ANON_KEY")!, {
@@ -31,7 +36,7 @@ Deno.serve(async (req) => {
     data: { user: caller },
   } = await callerClient.auth.getUser();
   if (!caller) {
-    return new Response(JSON.stringify({ error: "Not authenticated" }), { status: 401 });
+    return jsonResponse({ error: "Not authenticated" }, 401);
   }
 
   const { data: callerAdmin } = await callerClient
@@ -41,14 +46,12 @@ Deno.serve(async (req) => {
     .maybeSingle();
 
   if (!callerAdmin || callerAdmin.role !== "super_admin" || !callerAdmin.is_active) {
-    return new Response(JSON.stringify({ error: "Only an active super_admin can remove admins" }), {
-      status: 403,
-    });
+    return jsonResponse({ error: "Only an active super_admin can remove admins" }, 403);
   }
 
   const { admin_id } = await req.json();
   if (!admin_id) {
-    return new Response(JSON.stringify({ error: "admin_id is required" }), { status: 400 });
+    return jsonResponse({ error: "admin_id is required" }, 400);
   }
 
   const adminClient = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
@@ -60,19 +63,16 @@ Deno.serve(async (req) => {
     .maybeSingle();
 
   if (!target) {
-    return new Response(JSON.stringify({ error: "Admin not found" }), { status: 404 });
+    return jsonResponse({ error: "Admin not found" }, 404);
   }
   if (target.role === "super_admin") {
-    return new Response(JSON.stringify({ error: "Cannot remove a super_admin account" }), { status: 400 });
+    return jsonResponse({ error: "Cannot remove a super_admin account" }, 400);
   }
 
   const { error: deleteError } = await adminClient.auth.admin.deleteUser(target.auth_user_id);
   if (deleteError) {
-    return new Response(JSON.stringify({ error: deleteError.message }), { status: 400 });
+    return jsonResponse({ error: deleteError.message }, 400);
   }
 
-  return new Response(JSON.stringify({ success: true }), {
-    status: 200,
-    headers: { "Content-Type": "application/json" },
-  });
+  return jsonResponse({ success: true });
 });

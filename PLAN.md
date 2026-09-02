@@ -12,7 +12,7 @@ A booking platform for one admin to manage his own meetings — replacing Topmat
 | Booking pages | Each admin gets their own separate public link (e.g. `/book/john/30min`, `/book/priya/intro-call`). No shared "pick an admin" landing page. |
 | Data visibility | Siloed. An admin only sees their own bookings, leads, notes, availability, event types. Enforced via Supabase Row Level Security (RLS) keyed on `admin_id`. |
 | Admin roles | Two roles: **Super-admin** (adds/removes/deactivates admin accounts, sees a company-wide admin list, but does not see into each admin's private bookings/leads unless explicitly needed later) and **Admin** (manages only their own calendar/events/leads). |
-| Admin management | Fully UI-driven: super-admin has a "Manage Admins" screen to add an admin (name, email → triggers Supabase invite), deactivate, or remove one. No manual DB edits, no hardcoded admin list/count. |
+| Admin management | Fully UI-driven: super-admin has a "Manage Admins" screen to add an admin by setting their name, email, and an initial password directly, deactivate, or remove one. No manual DB edits, no hardcoded admin list/count. |
 | No-hardcoding principle | Applies system-wide: availability, event types, admins, and integration credentials (Google Calendar connection, WhatsApp/email sender config) are all set up and stored via UI/DB — never hardcoded in code or manually pasted into n8n per admin. |
 | Frontend-only architecture | No custom backend/API routes. Supabase (DB + Auth + Edge Functions) is the entire backend. |
 | Admin auth | Supabase Auth, email + password. One admin user. |
@@ -33,7 +33,7 @@ A booking platform for one admin to manage his own meetings — replacing Topmat
 
 ### Super-Admin Panel (new)
 - Login (Supabase Auth, role = `super_admin`)
-- **Manage Admins**: list all admins, add new admin (name, email → Supabase invite email sent), deactivate/reactivate, remove
+- **Manage Admins**: list all admins, add new admin (name, email, initial password set directly — plus edit/reset password later), deactivate/reactivate, remove
 - Each admin row shows: Google Calendar connection status, active/inactive, number of upcoming bookings (metadata only — not full booking detail, keeping the siloed principle)
 - Assigns each admin a unique slug used in their public booking URLs (auto-generated from name, editable)
 
@@ -62,7 +62,7 @@ A booking platform for one admin to manage his own meetings — replacing Topmat
 
 ## 4. End-to-End Flow
 
-1. **Super-admin setup**: Super-admin logs in, adds an admin (name, email, auto-generated slug) via "Manage Admins" UI. Supabase sends the admin an invite to set their password.
+1. **Super-admin setup**: Super-admin logs in, adds an admin (name, email, password, auto-generated slug) via "Manage Admins" UI. The admin can log in immediately with those credentials — no invite email involved. Both the super-admin and the admin themselves can change the password later.
 2. **Admin setup**: Admin logs in, connects their own Google Calendar (OAuth — token stored against their `admin_id`), sets weekly availability (IST), creates their event types.
 3. **Client visits an admin's public booking link** (`/book/[admin-slug]/[event-type-slug]`) → frontend queries Supabase for that admin's availability + existing bookings + manual blocks, and separately n8n/Edge Function fetches that admin's Google Calendar busy times (using their stored token) → merges into open slots → renders in client's local timezone.
 4. **Client picks a slot, fills form** → if paid event type, clicks dummy "Pay Now" → instantly proceeds.
@@ -126,7 +126,7 @@ A booking platform for one admin to manage his own meetings — replacing Topmat
 - [ ] Zaple account + API credentials for WhatsApp (default company-wide, with optional per-admin override)
 - [ ] Decide transactional email provider/credentials for the n8n email node (same default + override pattern)
 - [ ] Domain for hosting the Next.js app (Vercel)
-- [ ] Design the admin invite flow (Supabase Auth invite email → set password → land on their dashboard)
+- [x] Admin accounts are created directly (email + password set by super-admin), with edit/reset-password and a self-service "change password" setting — no invite email flow
 
 ## 8. Explicitly Out of Scope (v1)
 

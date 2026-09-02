@@ -12,13 +12,25 @@ export async function listAdmins(): Promise<Admin[]> {
   return data as Admin[];
 }
 
-export async function inviteAdmin(input: { name: string; email: string }): Promise<Admin> {
+export async function createAdmin(input: { name: string; email: string; password: string }): Promise<Admin> {
   const supabase = createClient();
-  const { data, error } = await supabase.functions.invoke("invite-admin", { body: input });
+  const { data, error } = await supabase.functions.invoke("create-admin", { body: input });
 
   if (error) throw error;
   if (data?.error) throw new Error(data.error);
   return data.admin as Admin;
+}
+
+export async function updateAdmin(input: {
+  admin_id: string;
+  name?: string;
+  email?: string;
+  password?: string;
+}): Promise<void> {
+  const supabase = createClient();
+  const { data, error } = await supabase.functions.invoke("update-admin", { body: input });
+  if (error) throw error;
+  if (data?.error) throw new Error(data.error);
 }
 
 export async function setAdminActive(id: string, isActive: boolean): Promise<void> {

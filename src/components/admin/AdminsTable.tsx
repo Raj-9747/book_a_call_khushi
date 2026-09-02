@@ -1,10 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { CalendarCheck2, CalendarX2, MoreHorizontal, Trash2 } from "lucide-react";
+import { CalendarCheck2, CalendarX2, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import { Avatar, Badge, Button } from "@/components/ui";
+import { ActionsMenu, Avatar, Badge } from "@/components/ui";
 import { removeAdmin, setAdminActive } from "@/lib/api/admins";
+import { EditAdminModal } from "./EditAdminModal";
 import type { Admin } from "@/types/models";
 
 export function AdminsTable({
@@ -15,7 +16,7 @@ export function AdminsTable({
   onChange: (admins: Admin[]) => void;
 }) {
   const [busyId, setBusyId] = useState<string | null>(null);
-  const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
+  const [editingAdmin, setEditingAdmin] = useState<Admin | null>(null);
 
   async function handleToggleActive(admin: Admin) {
     setBusyId(admin.id);
@@ -29,7 +30,6 @@ export function AdminsTable({
       toast.error(err instanceof Error ? err.message : "Failed to update admin");
     } finally {
       setBusyId(null);
-      setMenuOpenId(null);
     }
   }
 
@@ -44,7 +44,6 @@ export function AdminsTable({
       toast.error(err instanceof Error ? err.message : "Failed to remove admin");
     } finally {
       setBusyId(null);
-      setMenuOpenId(null);
     }
   }
 
@@ -101,40 +100,30 @@ export function AdminsTable({
                   {admin.is_active ? "Active" : "Deactivated"}
                 </Badge>
               </td>
-              <td className="relative px-6 py-3.5 text-right">
+              <td className="px-6 py-3.5 text-right">
                 {admin.role !== "super_admin" && (
-                  <>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      disabled={busyId === admin.id}
-                      onClick={() => setMenuOpenId(menuOpenId === admin.id ? null : admin.id)}
-                    >
-                      <MoreHorizontal className="h-4 w-4" />
-                    </Button>
-                    {menuOpenId === admin.id && (
-                      <div className="absolute right-6 top-11 z-10 w-44 rounded-md border border-border bg-surface py-1 shadow-md">
-                        <button
-                          className="block w-full px-3 py-2 text-left text-sm text-neutral-700 hover:bg-neutral-50"
-                          onClick={() => handleToggleActive(admin)}
-                        >
-                          {admin.is_active ? "Deactivate" : "Reactivate"}
-                        </button>
-                        <button
-                          className="flex w-full items-center gap-1.5 px-3 py-2 text-left text-sm text-danger-500 hover:bg-red-50"
-                          onClick={() => handleRemove(admin)}
-                        >
-                          <Trash2 className="h-3.5 w-3.5" /> Remove
-                        </button>
-                      </div>
-                    )}
-                  </>
+                  <ActionsMenu
+                    disabled={busyId === admin.id}
+                    items={[
+                      { label: "Edit", icon: Pencil, onClick: () => setEditingAdmin(admin) },
+                      {
+                        label: admin.is_active ? "Deactivate" : "Reactivate",
+                        onClick: () => handleToggleActive(admin),
+                      },
+                      { label: "Remove", icon: Trash2, tone: "danger", onClick: () => handleRemove(admin) },
+                    ]}
+                  />
                 )}
               </td>
             </tr>
           ))}
         </tbody>
       </table>
+      <EditAdminModal
+        admin={editingAdmin}
+        onClose={() => setEditingAdmin(null)}
+        onUpdated={(updated) => onChange(admins.map((a) => (a.id === updated.id ? updated : a)))}
+      />
     </div>
   );
 }

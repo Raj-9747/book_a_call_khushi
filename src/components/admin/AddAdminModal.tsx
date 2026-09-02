@@ -6,12 +6,13 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
 import { Modal, Button, FormField, Input } from "@/components/ui";
-import { inviteAdmin } from "@/lib/api/admins";
+import { createAdmin } from "@/lib/api/admins";
 import type { Admin } from "@/types/models";
 
 const schema = z.object({
   name: z.string().min(1, "Name is required"),
   email: z.string().min(1, "Email is required").email("Enter a valid email address"),
+  password: z.string().min(8, "Password must be at least 8 characters"),
 });
 type FormValues = z.infer<typeof schema>;
 
@@ -40,12 +41,12 @@ export function AddAdminModal({
   async function onSubmit(values: FormValues) {
     setSubmitting(true);
     try {
-      const admin = await inviteAdmin(values);
-      toast.success(`Invite sent to ${values.email}`);
+      const admin = await createAdmin(values);
+      toast.success(`${values.name} can now log in with the email + password you set`);
       onCreated(admin);
       handleClose();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to invite admin");
+      toast.error(err instanceof Error ? err.message : "Failed to add admin");
     } finally {
       setSubmitting(false);
     }
@@ -56,7 +57,7 @@ export function AddAdminModal({
       open={open}
       onClose={handleClose}
       title="Add an admin"
-      description="They'll get an email invite to set their password and connect their calendar."
+      description="Set their login email and an initial password — share it with them yourself."
     >
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
         <FormField label="Full name" htmlFor="name" error={errors.name?.message} required>
@@ -65,12 +66,21 @@ export function AddAdminModal({
         <FormField label="Email" htmlFor="email" error={errors.email?.message} required>
           <Input id="email" type="email" placeholder="priya@company.com" {...register("email")} />
         </FormField>
+        <FormField
+          label="Initial password"
+          htmlFor="password"
+          error={errors.password?.message}
+          hint="At least 8 characters. They can change it later from their account settings."
+          required
+        >
+          <Input id="password" type="text" placeholder="Set a password" {...register("password")} />
+        </FormField>
         <div className="flex justify-end gap-2 pt-2">
           <Button type="button" variant="outline" onClick={handleClose}>
             Cancel
           </Button>
           <Button type="submit" isLoading={submitting}>
-            Send invite
+            Add admin
           </Button>
         </div>
       </form>

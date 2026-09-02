@@ -1,7 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-const PUBLIC_ROUTE_PREFIXES = ["/book", "/login", "/auth"];
+const PUBLIC_ROUTE_PREFIXES = ["/book", "/login"];
 
 function isPublicRoute(pathname: string) {
   return (
