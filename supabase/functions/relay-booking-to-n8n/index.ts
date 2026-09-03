@@ -26,6 +26,26 @@ const GOOGLE_CLIENT_SECRET = Deno.env.get("GOOGLE_CLIENT_SECRET")!;
 const N8N_BOOKING_WEBHOOK_URL = Deno.env.get("N8N_BOOKING_WEBHOOK_URL")!;
 const BOOKING_WEBHOOK_SECRET = Deno.env.get("BOOKING_WEBHOOK_SECRET")!;
 
+/** Formats an ISO instant for display in a given IANA timezone, e.g.
+ * "04 Sep 2026, 12:00 PM" — computed once here so every downstream channel
+ * (email, WhatsApp, future SMS) gets a ready-to-use string instead of each
+ * n8n node needing its own Luxon/date-formatting expression. */
+function formatInTimeZone(iso: string, timeZone: string): string {
+  try {
+    return new Intl.DateTimeFormat("en-IN", {
+      timeZone,
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true,
+    }).format(new Date(iso));
+  } catch {
+    return iso; // Invalid/unknown timezone string — fall back to the raw ISO rather than throwing.
+  }
+}
+
 async function refreshGoogleAccessToken(refreshToken: string): Promise<string | null> {
   const response = await fetch("https://oauth2.googleapis.com/token", {
     method: "POST",
@@ -89,6 +109,11 @@ Deno.serve(async (req) => {
         id: booking.id,
         start_time: booking.start_time,
         end_time: booking.end_time,
+        // Pre-formatted for direct use in messages — "start_time" above
+        // stays raw ISO for anything that needs to compute with it (e.g.
+        // the Google Calendar event creation step).
+        start_time_ist: formatInTimeZone(booking.start_time, "Asia/Kolkata"),
+        start_time_client_tz: formatInTimeZone(booking.start_time, booking.client_timezone || "Asia/Kolkata"),
         client_name: booking.client_name,
         client_email: booking.client_email,
         client_phone: booking.client_phone,
