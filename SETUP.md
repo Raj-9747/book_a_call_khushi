@@ -11,6 +11,7 @@ Things needed from your side to get the current build running and testable. Grow
   - `0003_public_booking.sql` — RPC functions the public booking page depends on
   - `0004_fix_create_public_booking_ambiguity.sql` — bug fix for `0003`'s booking-creation function
   - `0005_booking_confirmed_immediately.sql` — bookings are confirmed on creation regardless of Calendar connection
+  - `0006_add_admin_phone.sql` — adds a `phone` column to admins (needed for WhatsApp notifications), backfills existing admins with a placeholder number you should update to their real one
 
 No Auth email/redirect configuration is needed for admin accounts — they're created directly with an email + password the super-admin sets, not via invite email.
 

@@ -1,9 +1,10 @@
 // Supabase Edge Function: update-admin
 //
 // Called by the super-admin's "Edit Admin" UI to change an admin's name,
-// email, and/or password. Email and password changes must go through the
-// service role (auth.admin API) so the Supabase Auth user and the `admins`
-// row never drift out of sync.
+// email, phone, and/or password. Email and password changes must go through
+// the service role (auth.admin API) so the Supabase Auth user and the
+// `admins` row never drift out of sync. Changing the email also clears the
+// stored Google Calendar connection, forcing a reconnect.
 //
 // Deploy:
 //   supabase functions deploy update-admin
@@ -50,14 +51,14 @@ Deno.serve(async (req) => {
     return jsonResponse({ error: "Only an active super_admin can edit admins" }, 403);
   }
 
-  const { admin_id, name, email, password } = await req.json();
+  const { admin_id, name, email, phone, password } = await req.json();
   if (!admin_id) {
     return jsonResponse({ error: "admin_id is required" }, 400);
   }
   if (password && password.length < 8) {
     return jsonResponse({ error: "Password must be at least 8 characters" }, 400);
   }
-  if (!name && !email && !password) {
+  if (!name && !email && !phone && !password) {
     return jsonResponse({ error: "Nothing to update" }, 400);
   }
 
@@ -100,9 +101,18 @@ Deno.serve(async (req) => {
     }
   }
 
-  const rowUpdate: Record<string, string> = {};
+  const rowUpdate: Record<string, string | boolean | null> = {};
   if (name) rowUpdate.name = name;
   if (email) rowUpdate.email = email;
+  if (phone) rowUpdate.phone = phone;
+
+  // Changing the login email forces a Google Calendar reconnect — the
+  // admin's identity changed, so re-verifying via a fresh OAuth grant is
+  // the safer default rather than silently keeping the old token attached.
+  if (email) {
+    rowUpdate.google_calendar_connected = false;
+    rowUpdate.google_refresh_token = null;
+  }
 
   let admin = null;
   if (Object.keys(rowUpdate).length > 0) {

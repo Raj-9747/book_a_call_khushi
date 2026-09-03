@@ -12,7 +12,7 @@ export async function getCurrentAdmin(): Promise<Admin | null> {
 
   const { data } = await supabase
     .from("admins")
-    .select("id, name, email, slug, role, is_active, timezone, google_calendar_connected, weekly_availability, created_at")
+    .select("id, name, email, phone, slug, role, is_active, timezone, google_calendar_connected, weekly_availability, created_at")
     .eq("auth_user_id", user.id)
     .maybeSingle();
 

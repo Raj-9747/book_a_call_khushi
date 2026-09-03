@@ -12,6 +12,7 @@ import type { Admin } from "@/types/models";
 const schema = z.object({
   name: z.string().min(1, "Name is required"),
   email: z.string().min(1, "Email is required").email("Enter a valid email address"),
+  phone: z.string().min(8, "Enter a valid phone number"),
   password: z.string().min(8, "Password must be at least 8 characters"),
 });
 type FormValues = z.infer<typeof schema>;
@@ -68,6 +69,15 @@ export function AddAdminModal({
         </FormField>
         <FormField label="Email" htmlFor="email" error={errors.email?.message} required>
           <Input id="email" type="email" placeholder="priya@company.com" {...register("email")} />
+        </FormField>
+        <FormField
+          label="Phone number"
+          htmlFor="phone"
+          error={errors.phone?.message}
+          hint="Used for WhatsApp booking notifications."
+          required
+        >
+          <Input id="phone" type="tel" placeholder="9876543210" {...register("phone")} />
         </FormField>
         <FormField
           label="Initial password"

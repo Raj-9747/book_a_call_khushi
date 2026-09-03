@@ -61,9 +61,9 @@ Deno.serve(async (req) => {
     return jsonResponse({ error: "Only an active super_admin can add admins" }, 403);
   }
 
-  const { name, email, password } = await req.json();
-  if (!name || !email || !password) {
-    return jsonResponse({ error: "name, email and password are required" }, 400);
+  const { name, email, phone, password } = await req.json();
+  if (!name || !email || !phone || !password) {
+    return jsonResponse({ error: "name, email, phone and password are required" }, 400);
   }
   if (password.length < 8) {
     return jsonResponse({ error: "Password must be at least 8 characters" }, 400);
@@ -114,6 +114,7 @@ Deno.serve(async (req) => {
       auth_user_id: created.user.id,
       name,
       email,
+      phone,
       slug,
       role: "admin",
     })

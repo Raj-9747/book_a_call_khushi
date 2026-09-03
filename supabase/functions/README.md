@@ -6,8 +6,9 @@ These run server-side with the `service_role` key (never exposed to the browser)
 
 | Function | Purpose |
 |---|---|
-| `create-admin` | Super-admin "Add Admin" — creates the Auth user with an email + password the super-admin sets directly (no invite email), creates the `admins` row |
-| `update-admin` | Super-admin "Edit Admin" — updates name/email, and/or resets the password directly |
+| `create-admin` | Super-admin "Add Admin" — creates the Auth user with an email + password the super-admin sets directly (no invite email), creates the `admins` row (including phone) |
+| `update-admin` | Super-admin "Edit Admin" — updates name/email/phone, and/or resets the password directly. Changing the email clears the stored Google Calendar connection, forcing a reconnect |
+| `update-own-profile` | Any admin editing their OWN name/email/phone from Settings — same email-change → reconnect-Calendar behavior as `update-admin` |
 | `remove-admin` | Super-admin "Remove Admin" — deletes the Auth user (cascades to their data) |
 | `connect-google-calendar` | An admin's "Connect Google Calendar" — exchanges the OAuth code Google returns for a refresh token, stores it against that admin's own row |
 | `disconnect-google-calendar` | Revokes the token with Google and clears it from that admin's row |
@@ -39,6 +40,7 @@ supabase secrets set BOOKING_WEBHOOK_SECRET=<a-random-string-you-generate>
 # Deploy
 supabase functions deploy create-admin
 supabase functions deploy update-admin
+supabase functions deploy update-own-profile
 supabase functions deploy remove-admin
 supabase functions deploy connect-google-calendar
 supabase functions deploy disconnect-google-calendar

@@ -15,7 +15,7 @@ This folder holds the exported n8n workflow JSON files that power Zaptly's calen
 
 | File | Trigger | Purpose | Status |
 |---|---|---|---|
-| `workflows/create-booking-event.json` | Webhook (called by the `relay-booking-to-n8n` Supabase Edge Function on every new booking) | If the admin has Google Calendar connected: creates the event with a Meet link, attaches both client + admin as attendees (Google auto-emails them the invite), writes `meet_link`/`google_event_id` back to the booking. Either way, sends a confirmation email to the client via Gmail. | Built — needs your credentials wired up |
+| `workflows/create-booking-event.json` | Webhook (called by the `relay-booking-to-n8n` Supabase Edge Function on every new booking) | If the admin has Google Calendar connected: creates the event with a Meet link, attaches both client + admin as attendees, writes `meet_link`/`google_event_id` back to the booking. Either way, sends a confirmation email to the client AND a separate "you got a new booking" notification email to the admin via Gmail — the admin is the event's *organizer* on their own calendar, so Google doesn't email organizers the way it emails guests, which is why this explicit admin email exists. | Built — needs your credentials wired up |
 | `workflows/reminder-cron.json` | Schedule (every 10 min) | Finds confirmed bookings starting in ~1 hour that haven't been reminded yet, sends a reminder email, marks `reminder_sent = true`. | Built — needs your credentials wired up |
 
 ## Getting the booking-created webhook URL into Supabase

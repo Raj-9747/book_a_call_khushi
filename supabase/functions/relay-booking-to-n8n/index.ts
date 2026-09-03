@@ -66,7 +66,7 @@ Deno.serve(async (req) => {
 
   const { data: admin } = await supabase
     .from("admins")
-    .select("id, name, email, timezone, google_calendar_connected, google_refresh_token, notification_config")
+    .select("id, name, email, phone, timezone, google_calendar_connected, google_refresh_token, notification_config")
     .eq("id", booking.admin_id)
     .maybeSingle();
 
@@ -95,7 +95,7 @@ Deno.serve(async (req) => {
         client_timezone: booking.client_timezone,
         custom_answers: booking.custom_answers,
       },
-      admin: admin ? { id: admin.id, name: admin.name, email: admin.email, timezone: admin.timezone } : null,
+      admin: admin ? { id: admin.id, name: admin.name, email: admin.email, phone: admin.phone, timezone: admin.timezone } : null,
       event_type: eventType ? { name: eventType.name, duration_minutes: eventType.duration_minutes } : null,
       google_access_token: googleAccessToken,
     }),
