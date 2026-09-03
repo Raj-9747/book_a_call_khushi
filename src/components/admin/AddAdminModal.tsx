@@ -43,6 +43,9 @@ export function AddAdminModal({
     try {
       const admin = await createAdmin(values);
       toast.success(`${values.name} can now log in with the email + password you set`);
+      toast.info(`If ${values.name} needs Google Calendar sync, add their Google email as a test user in Google Cloud Console first.`, {
+        duration: 8000,
+      });
       onCreated(admin);
       handleClose();
     } catch (err) {
