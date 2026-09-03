@@ -6,6 +6,7 @@ export interface PublicAdmin {
   slug: string;
   timezone: string;
   weekly_availability: Record<string, { enabled: boolean; start: string; end: string }>;
+  google_calendar_connected: boolean;
 }
 
 export interface PublicEventType {
@@ -57,6 +58,20 @@ export async function getBusyRanges(adminId: string, from: Date, to: Date): Prom
   });
   if (error) throw error;
   return data ?? [];
+}
+
+/** Checks the admin's actual Google Calendar for conflicts (e.g. a meeting
+ * they created directly in Google, not through Zaptly). Fails open — an
+ * expired token or any Calendar-side error just means no extra busy times
+ * come back, not that the whole page breaks. */
+export async function getGoogleBusyRanges(adminId: string, from: Date, to: Date): Promise<BusyRange[]> {
+  const supabase = createClient();
+  const { data, error } = await supabase.functions.invoke("get-google-busy-times", {
+    body: { admin_id: adminId, from: from.toISOString(), to: to.toISOString() },
+  });
+  if (error) return [];
+  const busy = (data?.busy ?? []) as { start: string; end: string }[];
+  return busy.map((b) => ({ start_time: b.start, end_time: b.end }));
 }
 
 export interface CreateBookingInput {

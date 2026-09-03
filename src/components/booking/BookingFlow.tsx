@@ -5,7 +5,13 @@ import { ArrowLeft, Clock } from "lucide-react";
 import { toast } from "sonner";
 import { Card, CardContent, Spinner } from "@/components/ui";
 import { computeAvailableSlots } from "@/lib/availability/computeSlots";
-import { getBusyRanges, createPublicBooking, type PublicAdmin, type PublicEventType } from "@/lib/api/publicBooking";
+import {
+  getBusyRanges,
+  getGoogleBusyRanges,
+  createPublicBooking,
+  type PublicAdmin,
+  type PublicEventType,
+} from "@/lib/api/publicBooking";
 import type { BookingDetailsValues } from "@/lib/validations/publicBooking";
 import { DateSlotPicker } from "./DateSlotPicker";
 import { BookingDetailsForm } from "./BookingDetailsForm";
@@ -27,18 +33,24 @@ export function BookingFlow({ admin, eventType }: { admin: PublicAdmin; eventTyp
   useEffect(() => {
     const from = new Date();
     const to = new Date(from.getTime() + 14 * 86_400_000);
-    getBusyRanges(admin.id, from, to)
-      .then((busyRanges) => {
+
+    Promise.all([
+      getBusyRanges(admin.id, from, to),
+      // Only bother calling Google if this admin actually has Calendar
+      // connected — avoids a wasted request (and network delay) otherwise.
+      admin.google_calendar_connected ? getGoogleBusyRanges(admin.id, from, to) : Promise.resolve([]),
+    ])
+      .then(([zaptlyBusyRanges, googleBusyRanges]) => {
         setSlots(
           computeAvailableSlots({
             weeklyAvailability: admin.weekly_availability,
             durationMinutes: eventType.duration_minutes,
-            busyRanges,
+            busyRanges: [...zaptlyBusyRanges, ...googleBusyRanges],
           })
         );
       })
       .catch((err) => toast.error(err instanceof Error ? err.message : "Failed to load availability"));
-  }, [admin.id, admin.weekly_availability, eventType.duration_minutes]);
+  }, [admin.id, admin.weekly_availability, admin.google_calendar_connected, eventType.duration_minutes]);
 
   async function submitBooking(finalDetails: BookingDetailsValues) {
     if (!selectedSlot) return;

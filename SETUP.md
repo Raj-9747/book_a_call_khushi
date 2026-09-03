@@ -12,6 +12,7 @@ Things needed from your side to get the current build running and testable. Grow
   - `0004_fix_create_public_booking_ambiguity.sql` — bug fix for `0003`'s booking-creation function
   - `0005_booking_confirmed_immediately.sql` — bookings are confirmed on creation regardless of Calendar connection
   - `0006_add_admin_phone.sql` — adds a `phone` column to admins (needed for WhatsApp notifications), backfills existing admins with a placeholder number you should update to their real one
+  - `0007_public_admin_calendar_flag.sql` — exposes `google_calendar_connected` on the public admin lookup, so the booking page knows whether to check Google Calendar for conflicts
 
 No Auth email/redirect configuration is needed for admin accounts — they're created directly with an email + password the super-admin sets, not via invite email.
 
@@ -95,6 +96,9 @@ Visit `http://localhost:3000` — you should land on `/login`.
 9. With Google Calendar connected, book a slot via the public page → check the n8n execution log for `create-booking-event` fired → confirm the event appeared on the admin's actual Google Calendar with a Meet link, and the booking row in Supabase got `meet_link`/`google_event_id` filled in.
 10. Check the client's inbox for the confirmation email.
 11. To test reminders without waiting: temporarily create a booking ~1 hour out, or manually run the `reminder-cron` workflow once from n8n's UI and check `reminder_sent` flips to `true` and the email arrives.
+
+**Google Calendar conflict detection**
+12. With Calendar connected, manually create an event directly in the admin's Google Calendar (not through Zaptly) at some time in the next 14 days → reload the admin's public booking page → confirm that time no longer shows as an available slot.
 
 ---
 

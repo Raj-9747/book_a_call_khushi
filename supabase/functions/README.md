@@ -13,6 +13,7 @@ These run server-side with the `service_role` key (never exposed to the browser)
 | `connect-google-calendar` | An admin's "Connect Google Calendar" — exchanges the OAuth code Google returns for a refresh token, stores it against that admin's own row |
 | `disconnect-google-calendar` | Revokes the token with Google and clears it from that admin's row |
 | `relay-booking-to-n8n` | Fires on every new booking (via a Supabase Database Webhook, not a user action) — refreshes the admin's Google access token if connected, then hands the booking off to n8n for Calendar/Meet creation + confirmation email |
+| `get-google-busy-times` | Called by the public booking page (anonymous visitors) to check the admin's real Google Calendar for conflicts, e.g. a meeting created directly in Google rather than through Zaptly. Fails open (returns no busy times) on any error, including an expired token |
 
 ## One-time setup (do this once you have the Supabase CLI installed)
 
@@ -45,9 +46,10 @@ supabase functions deploy remove-admin
 supabase functions deploy connect-google-calendar
 supabase functions deploy disconnect-google-calendar
 supabase functions deploy relay-booking-to-n8n --no-verify-jwt
+supabase functions deploy get-google-busy-times --no-verify-jwt
 ```
 
-`relay-booking-to-n8n` is deployed with `--no-verify-jwt` because it's called by a Supabase Database Webhook, not by a logged-in user — it authorizes the caller with the `x-webhook-secret` header instead (see `n8n/README.md`).
+`relay-booking-to-n8n` is deployed with `--no-verify-jwt` because it's called by a Supabase Database Webhook, not by a logged-in user — it authorizes the caller with the `x-webhook-secret` header instead (see `n8n/README.md`). `get-google-busy-times` is also `--no-verify-jwt` since it's called by anonymous public booking-page visitors — it's a read-only, non-sensitive lookup (same trust model as the public RPCs), so no auth check is needed.
 
 No Auth email templates or redirect URL configuration are required for admin management — accounts are created directly with a password, not via invite email.
 
