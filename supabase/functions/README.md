@@ -11,8 +11,7 @@ These run server-side with the `service_role` key (never exposed to the browser)
 | `remove-admin` | Super-admin "Remove Admin" — deletes the Auth user (cascades to their data) |
 | `connect-google-calendar` | An admin's "Connect Google Calendar" — exchanges the OAuth code Google returns for a refresh token, stores it against that admin's own row |
 | `disconnect-google-calendar` | Revokes the token with Google and clears it from that admin's row |
-
-More will be added once the n8n booking-confirmation relay is built.
+| `relay-booking-to-n8n` | Fires on every new booking (via a Supabase Database Webhook, not a user action) — refreshes the admin's Google access token if connected, then hands the booking off to n8n for Calendar/Meet creation + confirmation email |
 
 ## One-time setup (do this once you have the Supabase CLI installed)
 
@@ -32,13 +31,21 @@ supabase link --project-ref <your-project-ref>
 supabase secrets set GOOGLE_CLIENT_ID=<your-google-oauth-client-id>
 supabase secrets set GOOGLE_CLIENT_SECRET=<your-google-oauth-client-secret>
 
+# The booking → n8n relay needs these two (see n8n/README.md for how to get
+# the webhook URL and pick the random secret):
+supabase secrets set N8N_BOOKING_WEBHOOK_URL=<your-n8n-webhook-url>
+supabase secrets set BOOKING_WEBHOOK_SECRET=<a-random-string-you-generate>
+
 # Deploy
 supabase functions deploy create-admin
 supabase functions deploy update-admin
 supabase functions deploy remove-admin
 supabase functions deploy connect-google-calendar
 supabase functions deploy disconnect-google-calendar
+supabase functions deploy relay-booking-to-n8n --no-verify-jwt
 ```
+
+`relay-booking-to-n8n` is deployed with `--no-verify-jwt` because it's called by a Supabase Database Webhook, not by a logged-in user — it authorizes the caller with the `x-webhook-secret` header instead (see `n8n/README.md`).
 
 No Auth email templates or redirect URL configuration are required for admin management — accounts are created directly with a password, not via invite email.
 

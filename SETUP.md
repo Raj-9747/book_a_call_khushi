@@ -10,6 +10,7 @@ Things needed from your side to get the current build running and testable. Grow
   - `0002_restrict_event_type_delete.sql` — prevents deleting an event type that already has bookings
   - `0003_public_booking.sql` — RPC functions the public booking page depends on
   - `0004_fix_create_public_booking_ambiguity.sql` — bug fix for `0003`'s booking-creation function
+  - `0005_booking_confirmed_immediately.sql` — bookings are confirmed on creation regardless of Calendar connection
 
 No Auth email/redirect configuration is needed for admin accounts — they're created directly with an email + password the super-admin sets, not via invite email.
 
@@ -47,7 +48,22 @@ If your OAuth consent screen is in **Testing** status (the default until you exp
 
 **Each time you add a new admin who needs Google Calendar connected**, go to Google Cloud Console → APIs & Services → OAuth consent screen → **Test users** → **Add users** → enter their Google account email. This takes effect immediately, no review needed (limit: 100 test users, plenty for an internal team). Skip this only if you've published the app to Production (not recommended for now — the calendar scope is "sensitive," so Google requires an app review with a privacy policy and domain verification, which is overkill for an internal tool).
 
-## 5. Local app setup
+## 5. n8n — booking confirmation + reminders
+
+You have an n8n instance running. To wire it up:
+
+- [ ] Import `n8n/workflows/create-booking-event.json` and `n8n/workflows/reminder-cron.json` into n8n
+- [ ] Connect a **Gmail OAuth2** credential to the Gmail node in both workflows (this is the account confirmation/reminder emails send from)
+- [ ] Decide how the workflows get your Supabase URL + service role key (self-hosted env vars vs. hardcoded in n8n Cloud) — see `n8n/README.md`
+- [ ] Activate `create-booking-event.json`, copy its Production Webhook URL
+- [ ] Set Edge Function secrets: `N8N_BOOKING_WEBHOOK_URL` (that URL) and `BOOKING_WEBHOOK_SECRET` (a random string you generate)
+- [ ] Deploy the relay function: `supabase functions deploy relay-booking-to-n8n --no-verify-jwt`
+- [ ] Supabase Dashboard → Database → Webhooks → create one on `bookings` INSERT → pointing at the `relay-booking-to-n8n` Edge Function → with header `x-webhook-secret: <same random string>`
+- [ ] Activate `reminder-cron.json` too
+
+Full step-by-step in [`n8n/README.md`](n8n/README.md).
+
+## 6. Local app setup
 
 ```bash
 cp .env.local.example .env.local
@@ -74,10 +90,14 @@ Visit `http://localhost:3000` — you should land on `/login`.
 7. From Settings (or the dashboard banner), click "Connect Google Calendar" → grant access → confirm it shows "Connected" afterward.
 8. Disconnect → confirm it reverts to "Not connected."
 
+**Booking confirmation pipeline**
+9. With Google Calendar connected, book a slot via the public page → check the n8n execution log for `create-booking-event` fired → confirm the event appeared on the admin's actual Google Calendar with a Meet link, and the booking row in Supabase got `meet_link`/`google_event_id` filled in.
+10. Check the client's inbox for the confirmation email.
+11. To test reminders without waiting: temporarily create a booking ~1 hour out, or manually run the `reminder-cron` workflow once from n8n's UI and check `reminder_sent` flips to `true` and the email arrives.
+
 ---
 
 ## Still to come (not needed yet, listed so nothing is a surprise later)
 
-- n8n instance URL + credentials (Google Calendar, Zaple WhatsApp, email/SMTP) — needed before the booking-confirmation flow (creating the actual Calendar event + Meet link, sending confirmation/reminders)
-- Zaple account/API key — needed before WhatsApp notifications
+- Zaple account/API key — WhatsApp confirmation/reminders (email via Gmail is built; WhatsApp isn't yet)
 - A domain, once we're ready to deploy beyond `localhost` (also needs adding to the Google OAuth redirect URIs)
