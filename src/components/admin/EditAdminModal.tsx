@@ -7,15 +7,17 @@ import { z } from "zod";
 import { toast } from "sonner";
 import { Modal, Button, FormField, Input } from "@/components/ui";
 import { updateAdmin } from "@/lib/api/admins";
+import { phoneSchema } from "@/lib/validations/phone";
 import type { Admin } from "@/types/models";
 
 const schema = z.object({
   name: z.string().min(1, "Name is required"),
   email: z.string().min(1, "Email is required").email("Enter a valid email address"),
-  phone: z.string().min(8, "Enter a valid phone number"),
+  phone: phoneSchema,
   password: z.union([z.literal(""), z.string().min(8, "Password must be at least 8 characters")]),
 });
-type FormValues = z.infer<typeof schema>;
+type FormInput = z.input<typeof schema>;
+type FormValues = z.output<typeof schema>;
 
 export function EditAdminModal({
   admin,
@@ -32,7 +34,7 @@ export function EditAdminModal({
     handleSubmit,
     reset,
     formState: { errors },
-  } = useForm<FormValues>({ resolver: zodResolver(schema) });
+  } = useForm<FormInput, unknown, FormValues>({ resolver: zodResolver(schema) });
 
   useEffect(() => {
     if (admin) reset({ name: admin.name, email: admin.email, phone: admin.phone ?? "", password: "" });

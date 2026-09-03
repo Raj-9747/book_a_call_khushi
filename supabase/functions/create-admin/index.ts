@@ -12,6 +12,7 @@
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { corsHeaders, jsonResponse } from "../_shared/cors.ts";
+import { normalizeIndianPhone } from "../_shared/phone.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -68,6 +69,10 @@ Deno.serve(async (req) => {
   if (password.length < 8) {
     return jsonResponse({ error: "Password must be at least 8 characters" }, 400);
   }
+  const normalizedPhone = normalizeIndianPhone(phone);
+  if (!normalizedPhone) {
+    return jsonResponse({ error: "Enter a valid 10-digit mobile number" }, 400);
+  }
 
   // Admin client with the service role — bypasses RLS, can manage auth users.
   const adminClient = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
@@ -114,11 +119,11 @@ Deno.serve(async (req) => {
       auth_user_id: created.user.id,
       name,
       email,
-      phone,
+      phone: normalizedPhone,
       slug,
       role: "admin",
     })
-    .select()
+    .select("id, name, email, phone, slug, role, is_active, timezone, google_calendar_connected, created_at")
     .single();
 
   if (insertError) {

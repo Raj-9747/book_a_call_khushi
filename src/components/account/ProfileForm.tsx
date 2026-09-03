@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -17,23 +18,26 @@ import {
   Input,
 } from "@/components/ui";
 import { updateOwnProfile } from "@/lib/api/admins";
+import { phoneSchema } from "@/lib/validations/phone";
 import type { Admin } from "@/types/models";
 
 const schema = z.object({
   name: z.string().min(1, "Name is required"),
   email: z.string().min(1, "Email is required").email("Enter a valid email address"),
-  phone: z.string().min(8, "Enter a valid phone number"),
+  phone: phoneSchema,
 });
-type FormValues = z.infer<typeof schema>;
+type FormInput = z.input<typeof schema>;
+type FormValues = z.output<typeof schema>;
 
 export function ProfileForm({ admin }: { admin: Admin }) {
+  const router = useRouter();
   const [submitting, setSubmitting] = useState(false);
   const {
     register,
     handleSubmit,
     reset,
     formState: { errors, isDirty },
-  } = useForm<FormValues>({
+  } = useForm<FormInput, unknown, FormValues>({
     resolver: zodResolver(schema),
     defaultValues: { name: admin.name, email: admin.email, phone: admin.phone ?? "" },
   });
@@ -48,10 +52,14 @@ export function ProfileForm({ admin }: { admin: Admin }) {
         phone: values.phone !== admin.phone ? values.phone : undefined,
       });
       toast.success("Profile updated");
+      reset({ name: updated.name, email: updated.email, phone: updated.phone ?? "" });
       if (emailChanged) {
         toast.info("Your email changed — please reconnect Google Calendar below.", { duration: 6000 });
+        // The Google Calendar card below reads `connected` from the initial
+        // server-rendered prop, not from this form's local state — refresh
+        // so it picks up the connection this just cleared.
+        router.refresh();
       }
-      reset({ name: updated.name, email: updated.email, phone: updated.phone ?? "" });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to update profile");
     } finally {

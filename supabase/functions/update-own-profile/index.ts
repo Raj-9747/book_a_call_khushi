@@ -13,6 +13,7 @@
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { corsHeaders, jsonResponse } from "../_shared/cors.ts";
+import { normalizeIndianPhone } from "../_shared/phone.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -54,6 +55,13 @@ Deno.serve(async (req) => {
   if (!name && !email && !phone) {
     return jsonResponse({ error: "Nothing to update" }, 400);
   }
+  let normalizedPhone: string | null = null;
+  if (phone) {
+    normalizedPhone = normalizeIndianPhone(phone);
+    if (!normalizedPhone) {
+      return jsonResponse({ error: "Enter a valid 10-digit mobile number" }, 400);
+    }
+  }
 
   const adminClient = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
 
@@ -85,7 +93,7 @@ Deno.serve(async (req) => {
 
   const rowUpdate: Record<string, string | boolean | null> = {};
   if (name) rowUpdate.name = name;
-  if (phone) rowUpdate.phone = phone;
+  if (normalizedPhone) rowUpdate.phone = normalizedPhone;
   if (isEmailChange) {
     rowUpdate.email = email;
     rowUpdate.google_calendar_connected = false;
