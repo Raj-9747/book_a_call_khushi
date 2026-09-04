@@ -134,6 +134,6 @@ A booking platform for one admin to manage his own meetings — replacing Topmat
 - Real payment gateway integration
 - Client self-service reschedule/cancel
 - Buffer time between bookings
-- Syncing manual blocks to actual Google Calendar
-- Automatic Google Calendar event deletion on cancel (manual for now)
 - Super-admin visibility into admins' individual bookings/leads (siloed by design)
+
+~~Syncing manual blocks to actual Google Calendar~~ and ~~automatic Google Calendar event deletion on cancel~~ — both since built (best-effort, via `sync-blocked-slot-calendar` and `delete-booking-calendar-event` Edge Functions).

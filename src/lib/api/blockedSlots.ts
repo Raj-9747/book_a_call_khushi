@@ -21,6 +21,17 @@ function istDateTimeToIso(date: string, time: string): string {
   return new Date(`${date}T${time}:00+05:30`).toISOString();
 }
 
+/** Best-effort sync to the admin's real Google Calendar — never blocks or
+ * fails the block/unblock action itself over a Calendar-side hiccup. */
+async function syncToCalendar(action: "create" | "delete", blockedSlotId: string): Promise<void> {
+  try {
+    const supabase = createClient();
+    await supabase.functions.invoke("sync-blocked-slot-calendar", { body: { action, blocked_slot_id: blockedSlotId } });
+  } catch {
+    // Ignore — the block still works within Zaptly regardless.
+  }
+}
+
 export async function createBlockedSlot(adminId: string, input: BlockedSlotFormValues): Promise<BlockedSlot> {
   const startTime = input.allDay ? "00:00" : input.startTime;
   const endTime = input.allDay ? "23:59" : input.endTime;
@@ -38,10 +49,17 @@ export async function createBlockedSlot(adminId: string, input: BlockedSlotFormV
     .single();
 
   if (error) throw error;
-  return data as BlockedSlot;
+  const blockedSlot = data as BlockedSlot;
+
+  await syncToCalendar("create", blockedSlot.id);
+  return blockedSlot;
 }
 
 export async function deleteBlockedSlot(id: string): Promise<void> {
+  // Must happen BEFORE the row is deleted — the sync function needs to read
+  // this row to find its google_event_id.
+  await syncToCalendar("delete", id);
+
   const supabase = createClient();
   const { error } = await supabase.from("blocked_slots").delete().eq("id", id);
   if (error) throw error;

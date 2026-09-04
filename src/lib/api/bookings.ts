@@ -25,6 +25,16 @@ export async function updateBookingLeadInfo(id: string, input: { notes?: string;
 
 export async function cancelBooking(id: string): Promise<void> {
   const supabase = createClient();
+
+  // Best-effort — remove the corresponding Google Calendar event too, if
+  // one exists. Never blocks the cancellation itself over a Calendar-side
+  // hiccup (e.g. an expired token).
+  try {
+    await supabase.functions.invoke("delete-booking-calendar-event", { body: { booking_id: id } });
+  } catch {
+    // Ignore — cancellation still proceeds below regardless.
+  }
+
   const { error } = await supabase.from("bookings").update({ status: "cancelled" }).eq("id", id);
   if (error) throw error;
 }

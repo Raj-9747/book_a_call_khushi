@@ -68,5 +68,6 @@ export interface BlockedSlot {
   start_time: string;
   end_time: string;
   reason: string | null;
+  google_event_id?: string | null;
   created_at: string;
 }

@@ -13,6 +13,7 @@ Things needed from your side to get the current build running and testable. Grow
   - `0005_booking_confirmed_immediately.sql` — bookings are confirmed on creation regardless of Calendar connection
   - `0006_add_admin_phone.sql` — adds a `phone` column to admins (needed for WhatsApp notifications), backfills existing admins with a placeholder number you should update to their real one
   - `0007_public_admin_calendar_flag.sql` — exposes `google_calendar_connected` on the public admin lookup, so the booking page knows whether to check Google Calendar for conflicts
+  - `0008_blocked_slots_calendar_event.sql` — adds `google_event_id` to `blocked_slots`, so a manual block can be synced to (and removed from) the admin's real Google Calendar
 
 No Auth email/redirect configuration is needed for admin accounts — they're created directly with an email + password the super-admin sets, not via invite email.
 
@@ -99,6 +100,13 @@ Visit `http://localhost:3000` — you should land on `/login`.
 
 **Google Calendar conflict detection**
 12. With Calendar connected, manually create an event directly in the admin's Google Calendar (not through Zaptly) at some time in the next 14 days → reload the admin's public booking page → confirm that time no longer shows as an available slot.
+
+**Manual block ↔ Calendar sync**
+13. With Calendar connected, block a day/time from Availability → check the admin's real Google Calendar → confirm a "Blocked (Zaptly)" event appeared at that time.
+14. Remove that block from Zaptly → confirm the event disappears from Google Calendar too.
+
+**Cancel → Calendar cleanup**
+15. Book a slot (with Calendar connected) so a real Calendar event + Meet link gets created → cancel that booking from the Bookings dashboard → confirm the event is removed from the admin's Google Calendar.
 
 ---
 

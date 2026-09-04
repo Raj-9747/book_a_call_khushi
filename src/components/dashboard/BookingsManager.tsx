@@ -1,15 +1,22 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { formatInTimeZone } from "date-fns-tz";
-import { CheckCircle2, XCircle } from "lucide-react";
+import { CheckCircle2, Search, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/layout/PageHeader";
-import { ActionsMenu, Badge, Spinner } from "@/components/ui";
+import { ActionsMenu, Badge, Input, Select, Spinner } from "@/components/ui";
 import { cancelBooking, listBookings, markBookingCompleted, type BookingWithEventType } from "@/lib/api/bookings";
 import { LeadDetailModal } from "./LeadDetailModal";
 
 const IST = "Asia/Kolkata";
+
+const STATUS_OPTIONS = [
+  { value: "all", label: "All statuses" },
+  { value: "confirmed", label: "Confirmed" },
+  { value: "completed", label: "Completed" },
+  { value: "cancelled", label: "Cancelled" },
+];
 
 function statusTone(status: string): "brand" | "success" | "danger" | "neutral" {
   if (status === "confirmed" || status === "pending_confirmation") return "brand";
@@ -22,12 +29,33 @@ export function BookingsManager({ adminId }: { adminId: string }) {
   const [bookings, setBookings] = useState<BookingWithEventType[] | null>(null);
   const [selected, setSelected] = useState<BookingWithEventType | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [eventTypeFilter, setEventTypeFilter] = useState("all");
 
   useEffect(() => {
     listBookings(adminId)
       .then(setBookings)
       .catch((err) => toast.error(err instanceof Error ? err.message : "Failed to load bookings"));
   }, [adminId]);
+
+  const eventTypeOptions = useMemo(() => {
+    const names = new Set((bookings ?? []).map((b) => b.event_types?.name).filter((n): n is string => !!n));
+    return [{ value: "all", label: "All event types" }, ...Array.from(names).map((name) => ({ value: name, label: name }))];
+  }, [bookings]);
+
+  const filteredBookings = useMemo(() => {
+    if (!bookings) return null;
+    const query = search.trim().toLowerCase();
+    return bookings.filter((b) => {
+      if (statusFilter !== "all" && b.status !== statusFilter) return false;
+      if (eventTypeFilter !== "all" && b.event_types?.name !== eventTypeFilter) return false;
+      if (query && !b.client_name.toLowerCase().includes(query) && !b.client_email.toLowerCase().includes(query)) {
+        return false;
+      }
+      return true;
+    });
+  }, [bookings, search, statusFilter, eventTypeFilter]);
 
   async function handleCancel(booking: BookingWithEventType) {
     if (!confirm(`Cancel the booking with ${booking.client_name}?`)) return;
@@ -59,7 +87,7 @@ export function BookingsManager({ adminId }: { adminId: string }) {
   return (
     <>
       <PageHeader title="Bookings" description="Everyone who's booked time with you" />
-      <div className="p-4 sm:p-8">
+      <div className="space-y-4 p-4 sm:p-8">
         {bookings === null ? (
           <div className="flex justify-center py-16">
             <Spinner className="h-6 w-6 text-neutral-400" />
@@ -70,55 +98,78 @@ export function BookingsManager({ adminId }: { adminId: string }) {
             <p className="mt-1 text-sm text-neutral-500">Once clients book a call, they&apos;ll show up here.</p>
           </div>
         ) : (
-          <div className="overflow-hidden rounded-xl border border-border bg-surface">
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[720px] text-sm">
-                <thead>
-                  <tr className="border-b border-border bg-neutral-50 text-left text-xs font-medium uppercase tracking-wide text-neutral-500">
-                    <th className="px-6 py-3">Client</th>
-                    <th className="px-6 py-3">Event</th>
-                    <th className="px-6 py-3">When</th>
-                    <th className="px-6 py-3">Status</th>
-                    <th className="px-6 py-3">Tag</th>
-                    <th className="px-6 py-3" />
-                  </tr>
-                </thead>
-                <tbody>
-                  {bookings.map((booking) => (
-                    <tr key={booking.id} className="cursor-pointer border-b border-border last:border-0 hover:bg-neutral-50">
-                      <td className="px-6 py-3.5" onClick={() => setSelected(booking)}>
-                        <p className="font-medium text-neutral-900">{booking.client_name}</p>
-                        <p className="text-xs text-neutral-500">{booking.client_email}</p>
-                      </td>
-                      <td className="px-6 py-3.5 text-neutral-600" onClick={() => setSelected(booking)}>
-                        {booking.event_types?.name ?? "—"}
-                      </td>
-                      <td className="px-6 py-3.5 text-neutral-600" onClick={() => setSelected(booking)}>
-                        {formatInTimeZone(new Date(booking.start_time), IST, "MMM d, h:mm a")}
-                      </td>
-                      <td className="px-6 py-3.5" onClick={() => setSelected(booking)}>
-                        <Badge tone={statusTone(booking.status)}>{booking.status.replace("_", " ")}</Badge>
-                      </td>
-                      <td className="px-6 py-3.5" onClick={() => setSelected(booking)}>
-                        {booking.tag ? <Badge tone="neutral">{booking.tag}</Badge> : <span className="text-neutral-300">—</span>}
-                      </td>
-                      <td className="px-6 py-3.5 text-right">
-                        {booking.status !== "cancelled" && booking.status !== "completed" && (
-                          <ActionsMenu
-                            disabled={busyId === booking.id}
-                            items={[
-                              { label: "Mark completed", icon: CheckCircle2, onClick: () => handleComplete(booking) },
-                              { label: "Cancel booking", icon: XCircle, tone: "danger", onClick: () => handleCancel(booking) },
-                            ]}
-                          />
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+          <>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <div className="relative flex-1">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400" />
+                <Input
+                  placeholder="Search by name or email..."
+                  className="pl-9"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                />
+              </div>
+              <Select className="sm:w-44" value={statusFilter} onChange={setStatusFilter} options={STATUS_OPTIONS} />
+              <Select className="sm:w-48" value={eventTypeFilter} onChange={setEventTypeFilter} options={eventTypeOptions} />
             </div>
-          </div>
+
+            {filteredBookings && filteredBookings.length === 0 ? (
+              <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border-strong bg-surface py-16 text-center">
+                <p className="text-sm font-medium text-neutral-900">No bookings match your filters</p>
+                <p className="mt-1 text-sm text-neutral-500">Try clearing the search or filters above.</p>
+              </div>
+            ) : (
+              <div className="overflow-hidden rounded-xl border border-border bg-surface">
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[720px] text-sm">
+                    <thead>
+                      <tr className="border-b border-border bg-neutral-50 text-left text-xs font-medium uppercase tracking-wide text-neutral-500">
+                        <th className="px-6 py-3">Client</th>
+                        <th className="px-6 py-3">Event</th>
+                        <th className="px-6 py-3">When</th>
+                        <th className="px-6 py-3">Status</th>
+                        <th className="px-6 py-3">Tag</th>
+                        <th className="px-6 py-3" />
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredBookings?.map((booking) => (
+                        <tr key={booking.id} className="cursor-pointer border-b border-border last:border-0 hover:bg-neutral-50">
+                          <td className="px-6 py-3.5" onClick={() => setSelected(booking)}>
+                            <p className="font-medium text-neutral-900">{booking.client_name}</p>
+                            <p className="text-xs text-neutral-500">{booking.client_email}</p>
+                          </td>
+                          <td className="px-6 py-3.5 text-neutral-600" onClick={() => setSelected(booking)}>
+                            {booking.event_types?.name ?? "—"}
+                          </td>
+                          <td className="px-6 py-3.5 text-neutral-600" onClick={() => setSelected(booking)}>
+                            {formatInTimeZone(new Date(booking.start_time), IST, "MMM d, h:mm a")}
+                          </td>
+                          <td className="px-6 py-3.5" onClick={() => setSelected(booking)}>
+                            <Badge tone={statusTone(booking.status)}>{booking.status.replace("_", " ")}</Badge>
+                          </td>
+                          <td className="px-6 py-3.5" onClick={() => setSelected(booking)}>
+                            {booking.tag ? <Badge tone="neutral">{booking.tag}</Badge> : <span className="text-neutral-300">—</span>}
+                          </td>
+                          <td className="px-6 py-3.5 text-right">
+                            {booking.status !== "cancelled" && booking.status !== "completed" && (
+                              <ActionsMenu
+                                disabled={busyId === booking.id}
+                                items={[
+                                  { label: "Mark completed", icon: CheckCircle2, onClick: () => handleComplete(booking) },
+                                  { label: "Cancel booking", icon: XCircle, tone: "danger", onClick: () => handleCancel(booking) },
+                                ]}
+                              />
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </>
         )}
       </div>
 
