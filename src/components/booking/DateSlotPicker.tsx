@@ -9,10 +9,12 @@ import { Button } from "@/components/ui";
 export function DateSlotPicker({
   slots,
   visitorTimeZone,
+  selectedSlot,
   onSelect,
 }: {
   slots: Date[];
   visitorTimeZone: string;
+  selectedSlot: Date | null;
   onSelect: (slot: Date) => void;
 }) {
   const grouped = useMemo(() => groupSlotsByDay(slots, visitorTimeZone), [slots, visitorTimeZone]);
@@ -55,11 +57,20 @@ export function DateSlotPicker({
       </div>
 
       <div className="mt-4 grid grid-cols-3 gap-2 sm:grid-cols-4">
-        {daySlots.map((slot) => (
-          <Button key={slot.toISOString()} variant="outline" size="sm" onClick={() => onSelect(slot)}>
-            {formatInTimeZone(slot, visitorTimeZone, "h:mm a")}
-          </Button>
-        ))}
+        {daySlots.map((slot) => {
+          const isSelected = selectedSlot?.getTime() === slot.getTime();
+          return (
+            <Button
+              key={slot.toISOString()}
+              variant={isSelected ? "primary" : "outline"}
+              size="sm"
+              aria-pressed={isSelected}
+              onClick={() => onSelect(slot)}
+            >
+              {formatInTimeZone(slot, visitorTimeZone, "h:mm a")}
+            </Button>
+          );
+        })}
       </div>
 
       <p className="mt-3 text-xs text-neutral-400">Times shown in your timezone ({visitorTimeZone.replace("_", " ")})</p>

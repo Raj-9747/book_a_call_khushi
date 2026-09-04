@@ -158,6 +158,7 @@ export function BookingsManager({ adminId }: { adminId: string }) {
                         <th className="px-6 py-3">Event</th>
                         <th className="px-6 py-3">When</th>
                         <th className="px-6 py-3">Status</th>
+                        <th className="px-6 py-3">Amount</th>
                         <th className="px-6 py-3">Tag</th>
                         <th className="px-6 py-3" />
                       </tr>
@@ -177,6 +178,24 @@ export function BookingsManager({ adminId }: { adminId: string }) {
                           </td>
                           <td className="px-6 py-3.5" onClick={() => setSelected(booking)}>
                             <Badge tone={statusTone(booking.status)}>{booking.status.replace("_", " ")}</Badge>
+                          </td>
+                          <td className="px-6 py-3.5 whitespace-nowrap" onClick={() => setSelected(booking)}>
+                            {booking.amount_due === null ? (
+                              <span className="text-neutral-300">—</span>
+                            ) : booking.amount_due === 0 ? (
+                              <span className="text-neutral-500">Free</span>
+                            ) : (
+                              <>
+                                <span className="font-medium text-neutral-900">
+                                  ₹{booking.amount_due.toLocaleString("en-IN")}
+                                </span>
+                                {booking.discount_percent && (
+                                  <span className="ml-1.5 text-xs text-emerald-700">
+                                    −{booking.discount_percent}%
+                                  </span>
+                                )}
+                              </>
+                            )}
                           </td>
                           <td className="px-6 py-3.5" onClick={() => setSelected(booking)}>
                             {booking.tag ? <Badge tone="neutral">{booking.tag}</Badge> : <span className="text-neutral-300">—</span>}

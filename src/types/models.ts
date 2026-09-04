@@ -28,6 +28,27 @@ export interface Admin {
   booking_window_days: number;
 }
 
+export interface DiscountCode {
+  id: string;
+  admin_id: string;
+  code: string;
+  percent: number;
+  /** null = never expires */
+  expires_at: string | null;
+  /** null = unlimited */
+  max_uses: number | null;
+  times_used: number;
+  /** When true the code covers every event type this admin owns, and
+   * `event_type_ids` is ignored. */
+  applies_to_all: boolean;
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface DiscountCodeWithEvents extends DiscountCode {
+  event_type_ids: string[];
+}
+
 export type EnquiryStatus = "new" | "contacted" | "closed";
 
 export interface BookingEnquiry {
@@ -81,6 +102,14 @@ export interface Booking {
   client_timezone: string | null;
   status: BookingStatus;
   payment_status: PaymentStatus;
+  /** Pricing, as computed server-side at booking time. `base_amount` is the
+   * event type's list price; `amount_due` is what was actually charged
+   * after any discount. */
+  base_amount: number | null;
+  discount_code_id: string | null;
+  discount_percent: number | null;
+  amount_due: number | null;
+  currency: string;
   google_event_id: string | null;
   meet_link: string | null;
   reminder_sent: boolean;

@@ -14,7 +14,13 @@ export async function listBookings(adminId: string): Promise<BookingWithEventTyp
     .order("start_time", { ascending: false });
 
   if (error) throw error;
-  return (data ?? []) as unknown as BookingWithEventType[];
+  // Postgres `numeric` columns arrive as strings over PostgREST — normalize
+  // the money fields so callers can do arithmetic on them safely.
+  return (data ?? []).map((row) => ({
+    ...row,
+    base_amount: row.base_amount === null ? null : Number(row.base_amount),
+    amount_due: row.amount_due === null ? null : Number(row.amount_due),
+  })) as unknown as BookingWithEventType[];
 }
 
 export async function updateBookingLeadInfo(id: string, input: { notes?: string; tag?: LeadTag | null }): Promise<void> {

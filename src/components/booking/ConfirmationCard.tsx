@@ -7,11 +7,13 @@ export function ConfirmationCard({
   admin,
   eventType,
   startTime,
+  amountPaid,
   visitorTimeZone,
 }: {
   admin: PublicAdmin;
   eventType: PublicEventType;
   startTime: Date;
+  amountPaid: number;
   visitorTimeZone: string;
 }) {
   return (
@@ -26,6 +28,11 @@ export function ConfirmationCard({
           {formatInTimeZone(startTime, visitorTimeZone, "EEEE, MMMM d 'at' h:mm a")}
         </p>
         <p className="mt-1 text-xs text-neutral-400">({visitorTimeZone.replace("_", " ")})</p>
+        {amountPaid > 0 && (
+          <p className="mt-3 text-sm text-neutral-600">
+            Paid <span className="font-semibold text-neutral-900">₹{amountPaid.toLocaleString("en-IN")}</span>
+          </p>
+        )}
         <p className="mt-6 max-w-sm text-sm text-neutral-500">
           We&apos;ve received your booking. A confirmation with your Google Meet link will be sent to your email
           shortly.

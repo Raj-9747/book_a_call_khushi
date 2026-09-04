@@ -123,6 +123,31 @@ export async function getGoogleBusyRanges(adminId: string, from: Date, to: Date)
   return busy.map((b) => ({ start_time: b.start, end_time: b.end }));
 }
 
+export interface DiscountCheck {
+  valid: boolean;
+  percent: number | null;
+  reason: string | null;
+}
+
+/** Advisory only — lets the client see the discounted price before
+ * committing. `create_public_booking` re-validates and re-prices from
+ * scratch, so a code that expires in between is still rejected there. */
+export async function validateDiscountCode(
+  adminSlug: string,
+  eventSlug: string,
+  code: string
+): Promise<DiscountCheck> {
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc("validate_discount_code", {
+    p_admin_slug: adminSlug,
+    p_event_slug: eventSlug,
+    p_code: code,
+  });
+  if (error) throw error;
+  const row = data?.[0] as DiscountCheck | undefined;
+  return row ?? { valid: false, percent: null, reason: "That code isn't valid for this session." };
+}
+
 export interface CreateBookingInput {
   adminId: string;
   eventTypeId: string;
@@ -132,6 +157,7 @@ export interface CreateBookingInput {
   customAnswers: Record<string, string>;
   startTime: Date;
   clientTimezone: string;
+  discountCode?: string | null;
 }
 
 export interface CreatedBooking {
@@ -139,6 +165,7 @@ export interface CreatedBooking {
   start_time: string;
   end_time: string;
   status: string;
+  amount_due: number;
 }
 
 export async function createPublicBooking(input: CreateBookingInput): Promise<CreatedBooking> {
@@ -152,9 +179,10 @@ export async function createPublicBooking(input: CreateBookingInput): Promise<Cr
     p_custom_answers: input.customAnswers,
     p_start_time: input.startTime.toISOString(),
     p_client_timezone: input.clientTimezone,
+    p_discount_code: input.discountCode?.trim() || null,
   });
   if (error) throw error;
   const row = data?.[0];
   if (!row) throw new Error("Booking failed — please try again.");
-  return row;
+  return { ...row, amount_due: Number(row.amount_due) };
 }

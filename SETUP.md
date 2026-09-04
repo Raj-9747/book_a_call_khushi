@@ -16,6 +16,7 @@ Things needed from your side to get the current build running and testable. Grow
   - `0008_blocked_slots_calendar_event.sql` — adds `google_event_id` to `blocked_slots`, so a manual block can be synced to (and removed from) the admin's real Google Calendar
   - `0009_admin_profile.sql` — public profile fields (photo, headline, about, LinkedIn, Instagram), the accepting-bookings toggle, minimum-notice and booking-window settings, the `admin-photos` Storage bucket + its policies, and the public RPCs the new profile page uses
   - `0010_booking_enquiries.sql` — the `booking_enquiries` table (leads captured while an admin has bookings paused) and its public submission RPC; also re-creates `create_public_booking` so the toggle, minimum notice and booking window are enforced server-side, not just hidden in the UI
+  - `0011_discount_codes.sql` — discount codes + which event types each one covers, price columns on `bookings`, the advisory `validate_discount_code` RPC, and a `create_public_booking` that prices the booking and redeems the code server-side
 
 After running `0009`, confirm the bucket exists: Supabase Dashboard → Storage → you should see **`admin-photos`** (public, 2 MB limit, JPG/PNG/WebP only). The migration creates it, so there's nothing to click — this is just a check.
 
@@ -129,6 +130,23 @@ Visit `http://localhost:3000` — you should land on `/login`.
 **Booking rules**
 26. Availability → **Booking rules** → set minimum notice to e.g. 4 hours and booking window to 7 days → Save.
 27. Reload the public booking page → confirm no slots within the next 4 hours are offered, and no dates beyond 7 days out appear.
+
+**Event page redesign**
+28. Open a paid event's booking page → confirm the layout: admin photo/name/headline at the top, then event name with duration + price, an "About this session" block (the event type's description), the time picker, the discount link, and a **Continue** button that stays disabled until you pick a slot.
+29. Pick a slot → it highlights, the chosen date/time appears above the button, and Continue enables → click it → the details form opens in a modal.
+30. Fill the form → you get a price summary (list price, discount line, total) and the pay button → complete it → confirmation shows the amount paid.
+31. Do the same on a **free** event → no discount box, no payment step, and the modal's button reads "Confirm booking".
+
+**Discount codes**
+32. Dashboard → **Discounts** → New code → e.g. `SAVE20`, 20%, never expires, unlimited uses, all sessions → Create. Confirm it's stored in caps even if you typed lowercase.
+33. On a paid event page → click "Have a discount code?" → enter it → confirm the price updates everywhere (header, summary, pay button) and a green "applied" row appears with an × to remove it.
+34. Enter a nonsense code → confirm the generic "isn't valid for this session" error.
+35. Create a code scoped to **one specific** session → confirm it works there and is rejected on a different one.
+36. Create a code with **max uses = 1** → use it on a booking → try it again → it should now be rejected, and Discounts should show `1 / 1` with a **Used up** badge.
+37. Create a code expiring **yesterday** (edit an existing one) → confirm it's rejected and shows **Expired**.
+38. Deactivate a code → confirm it's rejected on the public page and shows **Inactive**.
+39. Book with a discount → check **Bookings**: the Amount column should show the discounted total with a `−20%` marker.
+40. Race check (optional): with a max-uses-1 code, submit two bookings at once from two tabs → exactly one should succeed.
 
 ---
 
