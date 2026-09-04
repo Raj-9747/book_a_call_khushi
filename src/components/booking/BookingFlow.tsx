@@ -30,9 +30,12 @@ export function BookingFlow({ admin, eventType }: { admin: PublicAdmin; eventTyp
   const [submitting, setSubmitting] = useState(false);
   const visitorTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
+  const windowDays = admin.booking_window_days ?? 14;
+  const minNoticeMinutes = admin.min_notice_minutes ?? 0;
+
   useEffect(() => {
     const from = new Date();
-    const to = new Date(from.getTime() + 14 * 86_400_000);
+    const to = new Date(from.getTime() + windowDays * 86_400_000);
 
     Promise.all([
       getBusyRanges(admin.id, from, to),
@@ -46,11 +49,20 @@ export function BookingFlow({ admin, eventType }: { admin: PublicAdmin; eventTyp
             weeklyAvailability: admin.weekly_availability,
             durationMinutes: eventType.duration_minutes,
             busyRanges: [...zaptlyBusyRanges, ...googleBusyRanges],
+            daysAhead: windowDays,
+            minNoticeMinutes,
           })
         );
       })
       .catch((err) => toast.error(err instanceof Error ? err.message : "Failed to load availability"));
-  }, [admin.id, admin.weekly_availability, admin.google_calendar_connected, eventType.duration_minutes]);
+  }, [
+    admin.id,
+    admin.weekly_availability,
+    admin.google_calendar_connected,
+    eventType.duration_minutes,
+    windowDays,
+    minNoticeMinutes,
+  ]);
 
   async function submitBooking(finalDetails: BookingDetailsValues) {
     if (!selectedSlot) return;

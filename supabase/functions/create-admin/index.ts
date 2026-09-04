@@ -12,6 +12,7 @@
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { corsHeaders, jsonResponse } from "../_shared/cors.ts";
+import { ADMIN_COLUMNS } from "../_shared/adminColumns.ts";
 import { normalizeIndianPhone } from "../_shared/phone.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -123,7 +124,7 @@ Deno.serve(async (req) => {
       slug,
       role: "admin",
     })
-    .select("id, name, email, phone, slug, role, is_active, timezone, google_calendar_connected, created_at")
+    .select(ADMIN_COLUMNS)
     .single();
 
   if (insertError) {

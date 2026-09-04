@@ -137,3 +137,273 @@ A booking platform for one admin to manage his own meetings — replacing Topmat
 - Super-admin visibility into admins' individual bookings/leads (siloed by design)
 
 ~~Syncing manual blocks to actual Google Calendar~~ and ~~automatic Google Calendar event deletion on cancel~~ — both since built (best-effort, via `sync-blocked-slot-calendar` and `delete-booking-calendar-event` Edge Functions).
+
+Items below are superseded by Phase 10: ~~Real payment gateway integration~~ (Razorpay), ~~Client self-service reschedule/cancel~~ (request-based, admin-approved).
+
+---
+
+## 9. Phase 10 — Public Profile, Magic Links, Discounts & Razorpay
+
+Everything from here down is the plan for the current phase. Nothing in sections 1–8 changes except where explicitly noted.
+
+## 9.1 Scope
+
+Six things, built in the order listed (each is independently testable):
+
+1. **Admin profile fields + Profile page** (Settings renamed) — photo, headline, about, LinkedIn, Instagram, accepting-bookings toggle, min-notice and booking-window settings
+2. **Public admin profile page** at `/book/[adminSlug]` — the missing route today
+3. **Event page redesign** — admin header, price/duration, about-this-session, date/slot picker, Continue button, details modal, discount box
+4. **Discount codes** — admin-managed, percent-only, scoped to chosen event types
+5. **Razorpay** — replaces dummy payment entirely
+6. **Magic link** (`/booking/[token]`) — read-only booking page with reschedule/cancel *requests*, plus the admin-side Requests queue
+
+## 9.2 Confirmed decisions (this phase)
+
+| Area | Decision |
+|---|---|
+| Backend | **Still no Next.js API routes.** Edge Functions are the backend — they run server-side with `service_role` and secrets the browser never sees. Razorpay order creation, signature verification and the webhook all live there. |
+| Razorpay account | **One company-wide account.** Keys are Edge Function secrets, not per-admin. |
+| Payment methods | Razorpay Checkout default set: UPI (intent + QR), cards, netbanking, wallets. Test mode simulates UPI. |
+| Currency | INR only. |
+| Dummy payment | **Removed entirely.** Free events skip payment; paid events go through Razorpay. |
+| Booking lifecycle | Paid bookings are created as `pending_payment` and **hold the slot for 10 minutes**, then auto-expire. Confirmed only after payment is verified server-side. |
+| Amount authority | **Always computed server-side** from the DB. The browser never sends a price. |
+| Payment truth | The **webhook** is the source of truth; the browser callback is an optimistic fast-path only. |
+| Magic link | Read-only booking details page. No self-serve reschedule/cancel — only **requests** to the admin. |
+| Requests | Live in a dedicated **Requests** queue plus a status badge on the Bookings row. Admin approves/rejects. |
+| Refunds | **Admin decides** — none / partial / full. Client-facing copy says "subject to approval, not guaranteed." |
+| Request notifications | **Dashboard only** for now — no email/WhatsApp to the admin on a new request. |
+| Discounts | Percent-only. Admin picks which of their event types each code applies to. Code stored and compared in ALL CAPS. |
+| 100% discount | Skips Razorpay, books as free. |
+| Bookings off | Admin toggle. Profile + event pages show "Currently unavailable" and a limited enquiry form (name, email, phone, message) → stored in a **separate `booking_enquiries` table**, surfaced as an Enquiries tab. |
+| Min notice | New admin setting, default **60 min**. Also closes the reminder gap (short-notice bookings previously never hit the 55–65 min window). |
+| Booking window | New admin setting, default **14 days** (currently hardcoded). |
+| Profile photo | File upload → Supabase Storage bucket. |
+| About-this-session | Reuses the existing `event_types.description`, relabelled in the UI. No new field. |
+| Custom questions | Unchanged — still collected in the details modal. |
+| Deactivated admin | Public profile and event pages 404. Inactive event types are hidden from the profile. |
+| Reviews / GST invoices | Not this phase. |
+
+## 9.3 Data model changes
+
+### Migration `0009_admin_profile.sql`
+`admins` gains:
+- `photo_url text`, `headline text`, `about text`, `linkedin_url text`, `instagram_url text` — all nullable; each renders publicly only if set
+- `accepting_bookings boolean not null default true`
+- `unavailable_message text` — optional custom line shown when bookings are off
+- `min_notice_minutes int not null default 60`
+- `booking_window_days int not null default 14`
+
+Also:
+- Supabase **Storage** bucket `admin-photos` (public read; write restricted to the owning admin's folder `<admin_id>/…`)
+- `drop function if exists get_public_admin(text);` then recreate returning the new profile fields + `accepting_bookings` *(reminder: Postgres can't change a function's return type via `CREATE OR REPLACE` — this bit us in `0007`)*
+- New RPC `get_public_admin_event_types(p_slug text)` — SECURITY DEFINER, returns active event types for the profile page (name, slug, duration, price, description). No PII.
+
+### Migration `0010_discount_codes.sql`
+```
+discount_codes
+  id, admin_id, code (upper, unique per admin), percent (1–100),
+  expires_at (nullable = never), max_uses (nullable = unlimited),
+  times_used int default 0, is_active bool default true, created_at
+discount_code_event_types
+  discount_code_id, event_type_id   -- composite PK
+```
+- RLS: admin-scoped both tables.
+- Unique index on `(admin_id, upper(code))`.
+- RPC `validate_discount_code(p_admin_slug, p_event_slug, p_code)` — SECURITY DEFINER, anon-callable, returns `{valid, percent, reason}`. **Read-only — never increments.** It exists purely so the UI can show "20% off applied" before checkout; the authoritative re-validation happens again inside `create-razorpay-order`.
+
+### Migration `0011_payments_and_magic_link.sql`
+`bookings` gains:
+- `manage_token uuid not null default gen_random_uuid()` + unique index — the magic link
+- `base_amount numeric`, `discount_code_id uuid`, `discount_percent int`, `amount_due numeric`, `amount_paid numeric`, `currency text default 'INR'`
+- `razorpay_order_id text`, `razorpay_payment_id text` (both indexed)
+- `refund_amount numeric`, `refund_status text`, `refunded_at timestamptz`
+- `cancelled_by text check (cancelled_by in ('admin','client_request'))`
+- `hold_expires_at timestamptz` — when a `pending_payment` row goes stale
+- `confirmation_sent boolean not null default false`
+
+Constraint changes:
+- `status` check gains `'pending_payment'` and `'expired'`
+- `payment_status` check becomes `free | pending | paid | failed | refunded | partially_refunded`
+- The double-booking unique index must treat `pending_payment` as **blocking** (a held slot is not bookable) but `expired`/`cancelled` as free
+
+New public RPC `get_booking_by_token(p_token uuid)` — SECURITY DEFINER, returns the booking + admin profile + event type for the magic-link page. Returns nothing once past the visibility cutoff (see 9.6).
+
+### Migration `0012_booking_change_requests.sql`
+```
+booking_change_requests
+  id, booking_id, type ('reschedule'|'cancel'),
+  client_message text, preferred_start_time timestamptz (nullable),
+  status ('pending'|'approved'|'rejected'),
+  admin_note text, created_at, resolved_at
+```
+- Public RPC `create_change_request(p_token, p_type, p_message, p_preferred_start)` — rate-limited by rejecting a second `pending` request on the same booking.
+- RLS: admin can read/update requests on their own bookings.
+
+### Migration `0013_booking_enquiries.sql`
+```
+booking_enquiries
+  id, admin_id, event_type_id (nullable), name, email, phone, message,
+  status ('new'|'contacted'|'closed'), created_at
+```
+- Public RPC `create_booking_enquiry(...)` for the bookings-off form.
+
+## 9.4 Payment flow (the security-critical part)
+
+```
+Client picks slot → fills details → optionally enters discount code
+        ↓
+[Edge] create-razorpay-order          (--no-verify-jwt, anon-callable)
+  1. Look up admin + event type by SLUG (never by id from the client)
+  2. Reject if admin inactive / not accepting bookings / event inactive
+  3. Re-validate the slot: inside availability, not blocked, not double-booked,
+     >= min_notice_minutes away, <= booking_window_days out
+  4. Read price FROM THE DB. Re-validate the discount code server-side
+     (active, not expired, under max_uses, applies to THIS event type)
+  5. amount = round(price * (100 - percent) / 100)
+  6. If amount == 0 → insert booking as confirmed/free, return {free: true}
+  7. Else insert booking as pending_payment, hold_expires_at = now() + 10 min
+  8. Create the Razorpay order for that amount (secret stays server-side)
+  9. Return { order_id, amount, key_id, booking_id } — NOT the manage_token
+        ↓
+Razorpay Checkout modal (UPI / QR / card / netbanking)
+        ↓
+   ┌────────────────────────────┴────────────────────────────┐
+   ↓ browser callback (fast path)              ↓ Razorpay → server (truth)
+[Edge] verify-razorpay-payment            [Edge] razorpay-webhook
+  HMAC(order_id|payment_id, KEY_SECRET)     HMAC(raw body, WEBHOOK_SECRET)
+  == razorpay_signature ?                   payment.captured / payment.failed
+        └────────────────────────────┬────────────────────────────┘
+                                     ↓
+              Booking → confirmed, payment_status → paid
+              (idempotent: whichever arrives first wins, second is a no-op)
+                                     ↓
+              manage_token returned to the client → confirmation screen
+                                     ↓
+              DB webhook → relay-booking-to-n8n → Calendar + Meet + email
+```
+
+**Security properties this gives us:**
+
+| Threat | Mitigation |
+|---|---|
+| Client tampers with the price | Amount is read from the DB inside the Edge Function; the request body has no price field at all |
+| Client forges a "paid" callback | Signature is HMAC-SHA256 with `RAZORPAY_KEY_SECRET`, which only the Edge Function holds |
+| Client skips the callback after paying | The webhook confirms it independently |
+| Webhook replay / duplicate delivery | Confirm is idempotent — keyed on `razorpay_payment_id`; a second delivery changes nothing |
+| Forged webhook call | `X-Razorpay-Signature` verified against the **raw request body** (must read `await req.text()`, not `req.json()`, before parsing) |
+| Discount abuse (expired / wrong event / over-used) | Re-validated server-side at order time; the pre-check RPC is advisory only |
+| Slot stolen while paying | The `pending_payment` row holds it, and the unique index blocks a second booking |
+| Slot held forever by an abandoned checkout | `hold_expires_at` + a cleanup job frees it after 10 min |
+| Race: two people pay for the same slot | The DB unique index rejects the second insert *before* an order is ever created |
+| Secrets leaking to the browser | Only `NEXT_PUBLIC_RAZORPAY_KEY_ID` is public (public by design). The secret and webhook secret live only as Edge Function secrets. |
+| Enumerating other people's bookings | `manage_token` is a random UUID, returned only after successful payment, and `get_booking_by_token` returns nothing else |
+
+**Cleanup job:** `expire-pending-bookings` Edge Function, called every 10 min by a new n8n schedule workflow (`expire-holds-cron.json`). Sets `status = 'expired'` where `pending_payment` and `hold_expires_at < now()`, freeing the slot.
+
+**Refunds:** `refund-razorpay-payment` (authenticated, admin-only) issues a full or partial refund via Razorpay and writes `refund_amount` / `refund_status` / `refunded_at`. Only reachable from the Requests queue and the booking detail modal.
+
+## 9.5 Confirmation-email regression to watch
+
+Today the DB webhook fires `relay-booking-to-n8n` on **INSERT**, and bookings are inserted already-confirmed. With `pending_payment`, an insert-triggered email would go out **before payment**.
+
+Fix: change the DB webhook to INSERT **or UPDATE**, and have `relay-booking-to-n8n` return early unless `status = 'confirmed' and confirmation_sent = false`. It sets `confirmation_sent = true` before dispatching, so an update storm can't double-send. This must be verified in testing — it's the easiest thing in this phase to break silently.
+
+The confirmation email also gains the **magic link** (`{{base_url}}/booking/{{manage_token}}`).
+
+## 9.6 Magic link page — `/booking/[token]`
+
+Read-only. Shows admin photo + name, event name, about-this-session, date/time in the client's timezone, Meet link, amount paid, and status.
+
+- A small "Need help?" corner offers **Request reschedule** / **Request cancellation**
+- Reschedule lets the client optionally propose a slot (reuses the existing picker) plus a message; cancel is message-only
+- On submit: "Your request has been sent to the admin" — the copy states clearly that **approval and any refund are at the admin's discretion**
+- Request buttons hide once the call start time has passed
+- The page stays reachable until **24h after the call ends**, then shows "this booking has passed"
+- One pending request per booking; a second attempt shows the existing request's status instead
+- `/booking` must be added to `PUBLIC_ROUTE_PREFIXES` in `src/lib/supabase/middleware.ts`
+
+## 9.7 Pages & routes
+
+| Route | Status | Notes |
+|---|---|---|
+| `/book/[adminSlug]` | **new** | Public profile — photo, name, headline, about, socials, event list. "Free" when price is 0. Bookings-off → unavailable state + enquiry form. |
+| `/book/[adminSlug]/[eventSlug]` | redesign | Admin header, price + duration, about, picker, **Continue**, details modal, discount box |
+| `/booking/[token]` | **new** | Magic link |
+| `/dashboard/profile` | **renamed** from `/dashboard/settings` | Photo upload, headline, about, socials, bookings toggle, plus existing name/email/phone/password |
+| `/dashboard/discounts` | **new** | Discount code CRUD + usage count |
+| `/dashboard/requests` | **new** | Pending reschedule/cancel queue, approve/reject, refund decision |
+| `/dashboard/bookings` | extended | Payment column, request badge on rows, **Enquiries** tab |
+| `/dashboard/availability` | extended | Min notice + booking window settings |
+
+Nav (`src/components/layout/nav-config.tsx`) gains Discounts and Requests; Settings becomes Profile. Requests carries a pending-count badge.
+
+## 9.8 Edge Functions (new / changed)
+
+| Function | Auth | Purpose |
+|---|---|---|
+| `create-razorpay-order` | `--no-verify-jwt` | Validates everything, creates the held booking + Razorpay order |
+| `verify-razorpay-payment` | `--no-verify-jwt` | Verifies the browser callback signature, confirms the booking |
+| `razorpay-webhook` | `--no-verify-jwt` | Authoritative confirm/fail/refund from Razorpay; raw-body HMAC |
+| `expire-pending-bookings` | `--no-verify-jwt` + shared secret | Releases stale holds (n8n cron) |
+| `refund-razorpay-payment` | authenticated | Admin-initiated full/partial refund |
+| `relay-booking-to-n8n` | *changed* | Confirmed-only guard, `confirmation_sent` flag, magic link + payment info in the payload |
+
+New secrets: `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET`, `PUBLIC_BASE_URL`.
+New `.env.local` var: `NEXT_PUBLIC_RAZORPAY_KEY_ID` (public by design).
+
+## 9.9 Edge cases to test
+
+**Profile / availability**
+- Admin with no photo/headline/about/socials — page must still look intentional, not broken
+- Admin with zero active event types
+- Deactivated admin → 404; inactive event type → 404
+- Bookings toggled off mid-session while a client sits on the event page → blocked at order time, not just hidden in the UI
+- Photo upload: oversized file, wrong MIME type, replacing an existing photo (old file should be cleaned up)
+
+**Discounts**
+- Expired, inactive, max-uses-reached, wrong event type, wrong admin's code, lowercase input, whitespace, nonexistent code
+- 100% code → no Razorpay, booking is free
+- Code applied in the UI then expires before the client clicks Pay → rejected server-side
+- Same code used concurrently on its last remaining use
+
+**Payments**
+- Client closes the Checkout modal → slot stays held 10 min, then frees
+- Payment fails → booking stays held, client can retry within the window
+- Payment succeeds but the browser dies before the callback → webhook still confirms it
+- Webhook arrives before the browser callback (common) → callback is a no-op
+- Duplicate webhook delivery → no double-confirm, no double-email
+- Two clients race for the last slot → second is rejected before an order is created
+- Hold expires *while* the client is paying → payment captured for an expired booking: reconfirm the slot is still free; if not, flag it for admin refund rather than double-booking
+- Amount rounding on odd percentages (Razorpay works in paise — all amounts converted with `Math.round(rupees * 100)`)
+
+**Magic link**
+- Invalid / random token → generic not-found, no information leak
+- Token for a cancelled, expired, or completed booking
+- Link opened after the 24h cutoff
+- Two requests submitted in quick succession
+- Client proposes a slot that's already taken → admin sees it flagged as unavailable
+
+**Requests**
+- Admin approves a reschedule → old Calendar event removed, new one created, client emailed
+- Admin rejects → booking unchanged, client not auto-notified (dashboard-only this phase)
+- Admin approves a cancellation with a partial refund → refund issued, Calendar event removed, `cancelled_by = 'client_request'`
+- Refund attempted on a free booking, or one already refunded
+
+**Regressions**
+- Confirmation email fires exactly once, and only after payment
+- Free bookings still work end to end (no Razorpay involvement)
+- Reminder cron unaffected; short-notice gap now closed by min-notice
+- Google Calendar conflict detection still respects the new booking-window setting
+
+## 9.10 What you'll need to provide
+
+- [ ] Razorpay **test** Key ID + Key Secret
+- [ ] After I deploy `razorpay-webhook`, add its URL in the Razorpay dashboard (Settings → Webhooks) with events `payment.captured`, `payment.failed`, `refund.processed`, and paste the webhook secret you set there — I'll give exact steps
+- [ ] Run migrations `0009`–`0013` and create the `admin-photos` Storage bucket (I'll provide the SQL and the dashboard steps)
+- [ ] Import the new `expire-holds-cron.json` n8n workflow and activate it
+- [ ] Re-deploy the listed Edge Functions and update the Supabase DB webhook to fire on INSERT **or UPDATE**
+
+## 9.11 Deferred to a later phase
+
+Testimonials/reviews, earnings & payout dashboard, buffer time, daily booking limits, embed widget, post-call follow-up email, digital products, multiple durations per event type, no-show tracking, analytics, custom branding, Zoom/Teams, GST invoices.

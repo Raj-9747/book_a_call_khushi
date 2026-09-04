@@ -14,6 +14,10 @@ Things needed from your side to get the current build running and testable. Grow
   - `0006_add_admin_phone.sql` — adds a `phone` column to admins (needed for WhatsApp notifications), backfills existing admins with a placeholder number you should update to their real one
   - `0007_public_admin_calendar_flag.sql` — exposes `google_calendar_connected` on the public admin lookup, so the booking page knows whether to check Google Calendar for conflicts
   - `0008_blocked_slots_calendar_event.sql` — adds `google_event_id` to `blocked_slots`, so a manual block can be synced to (and removed from) the admin's real Google Calendar
+  - `0009_admin_profile.sql` — public profile fields (photo, headline, about, LinkedIn, Instagram), the accepting-bookings toggle, minimum-notice and booking-window settings, the `admin-photos` Storage bucket + its policies, and the public RPCs the new profile page uses
+  - `0010_booking_enquiries.sql` — the `booking_enquiries` table (leads captured while an admin has bookings paused) and its public submission RPC; also re-creates `create_public_booking` so the toggle, minimum notice and booking window are enforced server-side, not just hidden in the UI
+
+After running `0009`, confirm the bucket exists: Supabase Dashboard → Storage → you should see **`admin-photos`** (public, 2 MB limit, JPG/PNG/WebP only). The migration creates it, so there's nothing to click — this is just a check.
 
 No Auth email/redirect configuration is needed for admin accounts — they're created directly with an email + password the super-admin sets, not via invite email.
 
@@ -107,6 +111,24 @@ Visit `http://localhost:3000` — you should land on `/login`.
 
 **Cancel → Calendar cleanup**
 15. Book a slot (with Calendar connected) so a real Calendar event + Meet link gets created → cancel that booking from the Bookings dashboard → confirm the event is removed from the admin's Google Calendar.
+
+**Public profile page** (needs migrations `0009`–`0010` and the three re-deployed Edge Functions)
+16. As an admin, go to **Profile** (the nav item that used to be Settings) → upload a photo, fill in headline, about, LinkedIn and Instagram → Save.
+17. Open `/book/<your-slug>` in an incognito window → confirm the photo, name, headline, about and social icons all appear, and your active event types are listed with duration and price (a ₹0 event should read **Free**).
+18. Clear the headline/about/socials and save → reload the public page → confirm those sections vanish cleanly rather than leaving gaps.
+19. Click an event → it opens the booking page, with a back link to the profile.
+20. Deactivate that admin from the super-admin panel → `/book/<slug>` should 404. Reactivate afterwards.
+21. Set an event type to inactive → confirm it disappears from the profile list.
+
+**Pause bookings**
+22. Profile → toggle **Accepting bookings** off, optionally write a custom message → Save.
+23. Reload `/book/<your-slug>` and an event page → both should show "Currently unavailable" with the short name/email/phone/message form instead of the slot picker.
+24. Submit that form → confirm the success message, then check **Bookings → Enquiries** in the dashboard for the new row; try "Mark contacted" and "Mark closed".
+25. Toggle bookings back on → confirm the slot picker returns.
+
+**Booking rules**
+26. Availability → **Booking rules** → set minimum notice to e.g. 4 hours and booking window to 7 days → Save.
+27. Reload the public booking page → confirm no slots within the next 4 hours are offered, and no dates beyond 7 days out appear.
 
 ---
 

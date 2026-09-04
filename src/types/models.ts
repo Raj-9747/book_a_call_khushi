@@ -12,6 +12,34 @@ export interface Admin {
   google_calendar_connected: boolean;
   weekly_availability?: unknown;
   created_at: string;
+
+  // Public profile — every field optional, each renders on /book/<slug>
+  // only when the admin has actually filled it in.
+  photo_url: string | null;
+  headline: string | null;
+  about: string | null;
+  linkedin_url: string | null;
+  instagram_url: string | null;
+
+  // Booking configuration
+  accepting_bookings: boolean;
+  unavailable_message: string | null;
+  min_notice_minutes: number;
+  booking_window_days: number;
+}
+
+export type EnquiryStatus = "new" | "contacted" | "closed";
+
+export interface BookingEnquiry {
+  id: string;
+  admin_id: string;
+  event_type_id: string | null;
+  name: string;
+  email: string;
+  phone: string | null;
+  message: string | null;
+  status: EnquiryStatus;
+  created_at: string;
 }
 
 export interface EventType {

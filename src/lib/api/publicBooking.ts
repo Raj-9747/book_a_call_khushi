@@ -7,6 +7,25 @@ export interface PublicAdmin {
   timezone: string;
   weekly_availability: Record<string, { enabled: boolean; start: string; end: string }>;
   google_calendar_connected: boolean;
+  photo_url: string | null;
+  headline: string | null;
+  about: string | null;
+  linkedin_url: string | null;
+  instagram_url: string | null;
+  accepting_bookings: boolean;
+  unavailable_message: string | null;
+  min_notice_minutes: number;
+  booking_window_days: number;
+}
+
+/** One row of the "pick a session" list on an admin's public profile. */
+export interface PublicAdminEventType {
+  id: string;
+  slug: string;
+  name: string;
+  duration_minutes: number;
+  price: number;
+  description: string | null;
 }
 
 export interface PublicEventType {
@@ -38,6 +57,36 @@ export async function getPublicAdmin(slug: string): Promise<PublicAdmin | null> 
   const row = data?.[0];
   if (!row) return null;
   return { ...row, weekly_availability: (row.weekly_availability ?? {}) as PublicAdmin["weekly_availability"] };
+}
+
+export async function getPublicAdminEventTypes(adminId: string): Promise<PublicAdminEventType[]> {
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc("get_public_admin_event_types", { p_admin_id: adminId });
+  if (error) throw error;
+  // `price` is Postgres `numeric`, which comes back over PostgREST as a
+  // string — normalize here so no caller has to remember.
+  return (data ?? []).map((row: PublicAdminEventType) => ({ ...row, price: Number(row.price) }));
+}
+
+/** Submitted from the public pages when an admin has bookings turned off. */
+export async function createBookingEnquiry(input: {
+  adminSlug: string;
+  eventSlug?: string | null;
+  name: string;
+  email: string;
+  phone?: string | null;
+  message?: string | null;
+}): Promise<void> {
+  const supabase = createClient();
+  const { error } = await supabase.rpc("create_booking_enquiry", {
+    p_admin_slug: input.adminSlug,
+    p_event_slug: input.eventSlug ?? null,
+    p_name: input.name,
+    p_email: input.email,
+    p_phone: input.phone ?? null,
+    p_message: input.message ?? null,
+  });
+  if (error) throw error;
 }
 
 export async function getPublicEventType(adminId: string, slug: string): Promise<PublicEventType | null> {

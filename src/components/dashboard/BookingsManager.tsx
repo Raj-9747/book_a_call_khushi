@@ -7,7 +7,11 @@ import { toast } from "sonner";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { ActionsMenu, Badge, Input, Select, Spinner } from "@/components/ui";
 import { cancelBooking, listBookings, markBookingCompleted, type BookingWithEventType } from "@/lib/api/bookings";
+import { cn } from "@/lib/utils";
+import { EnquiriesTable } from "./EnquiriesTable";
 import { LeadDetailModal } from "./LeadDetailModal";
+
+type Tab = "bookings" | "enquiries";
 
 const IST = "Asia/Kolkata";
 
@@ -32,6 +36,7 @@ export function BookingsManager({ adminId }: { adminId: string }) {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [eventTypeFilter, setEventTypeFilter] = useState("all");
+  const [tab, setTab] = useState<Tab>("bookings");
 
   useEffect(() => {
     listBookings(adminId)
@@ -88,7 +93,32 @@ export function BookingsManager({ adminId }: { adminId: string }) {
     <>
       <PageHeader title="Bookings" description="Everyone who's booked time with you" />
       <div className="space-y-4 p-4 sm:p-8">
-        {bookings === null ? (
+        <div className="flex gap-1 border-b border-border" role="tablist">
+          {([
+            { id: "bookings", label: "Bookings" },
+            { id: "enquiries", label: "Enquiries" },
+          ] as const).map(({ id, label }) => (
+            <button
+              key={id}
+              type="button"
+              role="tab"
+              aria-selected={tab === id}
+              onClick={() => setTab(id)}
+              className={cn(
+                "-mb-px border-b-2 px-3 py-2 text-sm font-medium transition-colors",
+                tab === id
+                  ? "border-brand-600 text-brand-700"
+                  : "border-transparent text-neutral-500 hover:text-neutral-900"
+              )}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {tab === "enquiries" ? (
+          <EnquiriesTable adminId={adminId} />
+        ) : bookings === null ? (
           <div className="flex justify-center py-16">
             <Spinner className="h-6 w-6 text-neutral-400" />
           </div>

@@ -1,15 +1,16 @@
 import { createClient } from "@/lib/supabase/client";
+import { ADMIN_COLUMNS } from "@/lib/api/adminColumns";
 import type { Admin } from "@/types/models";
 
 export async function listAdmins(): Promise<Admin[]> {
   const supabase = createClient();
   const { data, error } = await supabase
     .from("admins")
-    .select("id, name, email, phone, slug, role, is_active, timezone, google_calendar_connected, created_at")
+    .select(ADMIN_COLUMNS)
     .order("created_at", { ascending: true });
 
   if (error) throw error;
-  return data as Admin[];
+  return data as unknown as Admin[];
 }
 
 export async function createAdmin(input: {
@@ -50,6 +51,91 @@ export async function removeAdmin(id: string): Promise<void> {
   const { data, error } = await supabase.functions.invoke("remove-admin", { body: { admin_id: id } });
   if (error) throw error;
   if (data?.error) throw new Error(data.error);
+}
+
+const PHOTO_BUCKET = "admin-photos";
+const MAX_PHOTO_BYTES = 2 * 1024 * 1024;
+const ALLOWED_PHOTO_TYPES = ["image/jpeg", "image/png", "image/webp"];
+
+/** Public profile fields an admin edits about themselves. Unlike
+ * name/email/phone these don't touch the Supabase Auth user, so they go
+ * straight to the table under RLS — no Edge Function round-trip. */
+export interface ProfileFields {
+  headline?: string | null;
+  about?: string | null;
+  linkedin_url?: string | null;
+  instagram_url?: string | null;
+  accepting_bookings?: boolean;
+  unavailable_message?: string | null;
+  photo_url?: string | null;
+}
+
+export async function updateProfileFields(id: string, fields: ProfileFields): Promise<void> {
+  const supabase = createClient();
+  const { error } = await supabase.from("admins").update(fields).eq("id", id);
+  if (error) throw error;
+}
+
+/** Turns the stored public URL back into the object path inside the bucket,
+ * so the previous photo can be cleaned up when a new one is uploaded.
+ * Returns null for anything that isn't one of our own bucket URLs. */
+function photoPathFromUrl(url: string | null): string | null {
+  if (!url) return null;
+  const marker = `/${PHOTO_BUCKET}/`;
+  const index = url.indexOf(marker);
+  if (index === -1) return null;
+  const path = url.slice(index + marker.length).split("?")[0];
+  return path ? decodeURIComponent(path) : null;
+}
+
+/** Uploads a new profile photo, points the admin row at it, then removes
+ * the old file. Storage RLS confines writes to the `<admin_id>/` folder, so
+ * the id in the path is load-bearing, not cosmetic. */
+export async function uploadAdminPhoto(adminId: string, file: File, previousUrl: string | null): Promise<string> {
+  if (!ALLOWED_PHOTO_TYPES.includes(file.type)) {
+    throw new Error("Please choose a JPG, PNG or WebP image.");
+  }
+  if (file.size > MAX_PHOTO_BYTES) {
+    throw new Error("That image is larger than 2 MB. Please choose a smaller one.");
+  }
+
+  const supabase = createClient();
+  const extension = file.type === "image/png" ? "png" : file.type === "image/webp" ? "webp" : "jpg";
+  const path = `${adminId}/${crypto.randomUUID()}.${extension}`;
+
+  const { error: uploadError } = await supabase.storage
+    .from(PHOTO_BUCKET)
+    .upload(path, file, { contentType: file.type, upsert: false });
+  if (uploadError) throw uploadError;
+
+  const {
+    data: { publicUrl },
+  } = supabase.storage.from(PHOTO_BUCKET).getPublicUrl(path);
+
+  const { error: updateError } = await supabase.from("admins").update({ photo_url: publicUrl }).eq("id", adminId);
+  if (updateError) {
+    // Don't leave an orphaned file behind if the row update failed.
+    await supabase.storage.from(PHOTO_BUCKET).remove([path]);
+    throw updateError;
+  }
+
+  // Best-effort cleanup — a leftover old file is harmless, and failing the
+  // whole upload over it would be worse.
+  const oldPath = photoPathFromUrl(previousUrl);
+  if (oldPath && oldPath !== path) {
+    await supabase.storage.from(PHOTO_BUCKET).remove([oldPath]);
+  }
+
+  return publicUrl;
+}
+
+export async function removeAdminPhoto(adminId: string, currentUrl: string | null): Promise<void> {
+  const supabase = createClient();
+  const { error } = await supabase.from("admins").update({ photo_url: null }).eq("id", adminId);
+  if (error) throw error;
+
+  const path = photoPathFromUrl(currentUrl);
+  if (path) await supabase.storage.from(PHOTO_BUCKET).remove([path]);
 }
 
 /** An admin editing their OWN name/phone/email. Changing email forces a

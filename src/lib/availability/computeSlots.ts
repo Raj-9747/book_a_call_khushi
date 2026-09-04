@@ -40,15 +40,21 @@ export function computeAvailableSlots({
   durationMinutes,
   busyRanges,
   daysAhead = 14,
+  minNoticeMinutes = 0,
   now = new Date(),
 }: {
   weeklyAvailability: WeeklyAvailability;
   durationMinutes: number;
   busyRanges: BusyRange[];
   daysAhead?: number;
+  /** Slots closer than this to `now` are hidden, so an admin isn't ambushed
+   * by a booking minutes before it starts. Mirrored server-side in
+   * `create_public_booking` — this is presentation, not the guard. */
+  minNoticeMinutes?: number;
   now?: Date;
 }): Date[] {
   const slots: Date[] = [];
+  const earliestStart = addMinutes(now, minNoticeMinutes);
   const busy = busyRanges.map((b) => ({ start: new Date(b.start_time), end: new Date(b.end_time) }));
 
   const todayIstStr = formatInTimeZone(now, IST, "yyyy-MM-dd");
@@ -67,9 +73,9 @@ export function computeAvailableSlots({
     let cursor = dayStartUtc;
     while (!isBefore(dayEndUtc, addMinutes(cursor, durationMinutes))) {
       const slotEnd = addMinutes(cursor, durationMinutes);
-      const isPast = isBefore(cursor, now);
+      const tooSoon = isBefore(cursor, earliestStart);
       const overlapsBusy = busy.some((b) => cursor < b.end && slotEnd > b.start);
-      if (!isPast && !overlapsBusy) slots.push(cursor);
+      if (!tooSoon && !overlapsBusy) slots.push(cursor);
       cursor = addMinutes(cursor, durationMinutes);
     }
   }
