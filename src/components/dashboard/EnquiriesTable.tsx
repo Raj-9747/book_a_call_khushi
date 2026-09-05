@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { formatInTimeZone } from "date-fns-tz";
 import { CheckCircle2, MailCheck, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import { ActionsMenu, Badge, Spinner } from "@/components/ui";
+import { ActionsMenu, Badge, Spinner, useConfirm } from "@/components/ui";
 import { deleteEnquiry, listEnquiries, setEnquiryStatus, type EnquiryWithEventType } from "@/lib/api/enquiries";
 import type { EnquiryStatus } from "@/types/models";
 
@@ -21,6 +21,7 @@ function statusTone(status: EnquiryStatus): "brand" | "success" | "neutral" {
 export function EnquiriesTable({ adminId }: { adminId: string }) {
   const [enquiries, setEnquiries] = useState<EnquiryWithEventType[] | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const confirm = useConfirm();
 
   useEffect(() => {
     listEnquiries(adminId)
@@ -41,7 +42,7 @@ export function EnquiriesTable({ adminId }: { adminId: string }) {
   }
 
   async function handleDelete(id: string) {
-    if (!confirm("Delete this enquiry? This can't be undone.")) return;
+    if (!(await confirm({ description: "Delete this enquiry? This can't be undone.", tone: "danger" }))) return;
     setBusyId(id);
     try {
       await deleteEnquiry(id);

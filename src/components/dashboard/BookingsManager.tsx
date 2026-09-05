@@ -5,7 +5,7 @@ import { formatInTimeZone } from "date-fns-tz";
 import { CheckCircle2, Search, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/layout/PageHeader";
-import { ActionsMenu, Badge, Input, Select, Spinner } from "@/components/ui";
+import { ActionsMenu, Badge, Input, Select, Spinner, useConfirm } from "@/components/ui";
 import { cancelBooking, listBookings, markBookingCompleted, type BookingWithEventType } from "@/lib/api/bookings";
 import { cn } from "@/lib/utils";
 import { EnquiriesTable } from "./EnquiriesTable";
@@ -47,6 +47,7 @@ export function BookingsManager({ adminId }: { adminId: string }) {
   const [statusFilter, setStatusFilter] = useState("all");
   const [eventTypeFilter, setEventTypeFilter] = useState("all");
   const [tab, setTab] = useState<Tab>("bookings");
+  const confirm = useConfirm();
 
   useEffect(() => {
     listBookings(adminId)
@@ -73,7 +74,7 @@ export function BookingsManager({ adminId }: { adminId: string }) {
   }, [bookings, search, statusFilter, eventTypeFilter]);
 
   async function handleCancel(booking: BookingWithEventType) {
-    if (!confirm(`Cancel the booking with ${booking.client_name}?`)) return;
+    if (!(await confirm({ description: `Cancel the booking with ${booking.client_name}?`, tone: "danger" }))) return;
     setBusyId(booking.id);
     try {
       await cancelBooking(booking.id);

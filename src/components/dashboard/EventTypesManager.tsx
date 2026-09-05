@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { Plus } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/layout/PageHeader";
-import { Button, Spinner } from "@/components/ui";
+import { Button, Spinner, useConfirm } from "@/components/ui";
 import { deleteEventType, listEventTypes, setEventTypeActive } from "@/lib/api/eventTypes";
 import { EventTypesList } from "./EventTypesList";
 import { EventTypeFormModal } from "./EventTypeFormModal";
@@ -15,6 +15,7 @@ export function EventTypesManager({ adminId, adminSlug }: { adminId: string; adm
   const [busyId, setBusyId] = useState<string | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<EventType | null>(null);
+  const confirm = useConfirm();
 
   useEffect(() => {
     listEventTypes(adminId)
@@ -47,7 +48,7 @@ export function EventTypesManager({ adminId, adminSlug }: { adminId: string; adm
   }
 
   async function handleDelete(eventType: EventType) {
-    if (!confirm(`Delete "${eventType.name}"? This can't be undone.`)) return;
+    if (!(await confirm({ description: `Delete "${eventType.name}"? This can't be undone.`, tone: "danger" }))) return;
     setBusyId(eventType.id);
     try {
       await deleteEventType(eventType.id);

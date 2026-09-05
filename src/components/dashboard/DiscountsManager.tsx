@@ -5,7 +5,7 @@ import { formatInTimeZone } from "date-fns-tz";
 import { Pencil, Plus, Power, Tag, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/layout/PageHeader";
-import { ActionsMenu, Badge, Button, Spinner } from "@/components/ui";
+import { ActionsMenu, Badge, Button, Spinner, useConfirm } from "@/components/ui";
 import {
   deleteDiscountCode,
   listDiscountCodes,
@@ -35,6 +35,7 @@ export function DiscountsManager({ adminId }: { adminId: string }) {
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<DiscountCodeWithEvents | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const confirm = useConfirm();
 
   useEffect(() => {
     listDiscountCodes(adminId)
@@ -84,7 +85,13 @@ export function DiscountsManager({ adminId }: { adminId: string }) {
   }
 
   async function handleDelete(code: DiscountCodeWithEvents) {
-    if (!confirm(`Delete “${code.code}”? Bookings that already used it keep their discounted price.`)) return;
+    if (
+      !(await confirm({
+        description: `Delete "${code.code}"? Bookings that already used it keep their discounted price.`,
+        tone: "danger",
+      }))
+    )
+      return;
     setBusyId(code.id);
     try {
       await deleteDiscountCode(code.id);

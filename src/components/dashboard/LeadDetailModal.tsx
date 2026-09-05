@@ -50,20 +50,23 @@ export function LeadDetailModal({
   return (
     <Modal open={!!booking} onClose={onClose} title={booking.client_name} description={booking.event_types?.name}>
       <div className="max-h-[65vh] space-y-4 overflow-y-auto pr-1">
-        <div className="grid grid-cols-2 gap-3 text-sm">
-          <div>
+        <div className="grid grid-cols-2 gap-x-3 gap-y-3 text-sm">
+          <div className="min-w-0">
             <p className="text-neutral-400">Email</p>
-            <p className="text-neutral-900">{booking.client_email}</p>
+            {/* break-all, not break-words — an email has no spaces to break
+                on, so without this it overflows its grid cell and visually
+                overlaps the Phone column next to it. */}
+            <p className="break-all text-neutral-900">{booking.client_email}</p>
           </div>
-          <div>
+          <div className="min-w-0">
             <p className="text-neutral-400">Phone</p>
-            <p className="text-neutral-900">{booking.client_phone || "—"}</p>
+            <p className="break-all text-neutral-900">{booking.client_phone || "—"}</p>
           </div>
-          <div>
+          <div className="min-w-0">
             <p className="text-neutral-400">When</p>
             <p className="text-neutral-900">{formatInTimeZone(new Date(booking.start_time), IST, "MMM d, yyyy h:mm a")}</p>
           </div>
-          <div>
+          <div className="min-w-0">
             <p className="text-neutral-400">Status</p>
             <Badge tone={booking.status === "cancelled" ? "danger" : booking.status === "completed" ? "success" : "brand"}>
               {booking.status.replace("_", " ")}

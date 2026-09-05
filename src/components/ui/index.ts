@@ -9,6 +9,7 @@ export * from "./Badge";
 export * from "./Avatar";
 export * from "./Spinner";
 export * from "./Modal";
+export * from "./ConfirmDialog";
 export * from "./ActionsMenu";
 export * from "./Switch";
 export * from "./Checkbox";

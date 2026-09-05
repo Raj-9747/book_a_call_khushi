@@ -3,11 +3,12 @@
 import { useState } from "react";
 import { CalendarCheck2 } from "lucide-react";
 import { toast } from "sonner";
-import { Button } from "@/components/ui";
+import { Button, useConfirm } from "@/components/ui";
 import { disconnectGoogleCalendar, getGoogleAuthUrl } from "@/lib/api/googleCalendar";
 
 export function GoogleCalendarConnect({ connected }: { connected: boolean }) {
   const [disconnecting, setDisconnecting] = useState(false);
+  const confirm = useConfirm();
 
   function handleConnect() {
     try {
@@ -19,7 +20,8 @@ export function GoogleCalendarConnect({ connected }: { connected: boolean }) {
   }
 
   async function handleDisconnect() {
-    if (!confirm("Disconnect Google Calendar? Zaptly will stop checking your calendar for conflicts.")) return;
+    if (!(await confirm("Disconnect Google Calendar? Zaptly will stop checking your calendar for conflicts.")))
+      return;
     setDisconnecting(true);
     try {
       await disconnectGoogleCalendar();

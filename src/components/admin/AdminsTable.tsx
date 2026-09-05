@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { CalendarCheck2, CalendarX2, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import { ActionsMenu, Avatar, Badge } from "@/components/ui";
+import { ActionsMenu, Avatar, Badge, useConfirm } from "@/components/ui";
 import { removeAdmin, setAdminActive } from "@/lib/api/admins";
 import { EditAdminModal } from "./EditAdminModal";
 import type { Admin } from "@/types/models";
@@ -17,6 +17,7 @@ export function AdminsTable({
 }) {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [editingAdmin, setEditingAdmin] = useState<Admin | null>(null);
+  const confirm = useConfirm();
 
   async function handleToggleActive(admin: Admin) {
     setBusyId(admin.id);
@@ -34,7 +35,13 @@ export function AdminsTable({
   }
 
   async function handleRemove(admin: Admin) {
-    if (!confirm(`Remove ${admin.name}? This permanently deletes their account and all their data.`)) return;
+    if (
+      !(await confirm({
+        description: `Remove ${admin.name}? This permanently deletes their account and all their data.`,
+        tone: "danger",
+      }))
+    )
+      return;
     setBusyId(admin.id);
     try {
       await removeAdmin(admin.id);
