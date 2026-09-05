@@ -20,13 +20,23 @@ const STATUS_OPTIONS = [
   { value: "confirmed", label: "Confirmed" },
   { value: "completed", label: "Completed" },
   { value: "cancelled", label: "Cancelled" },
+  { value: "pending_payment", label: "Awaiting payment" },
+  { value: "expired", label: "Expired" },
 ];
 
-function statusTone(status: string): "brand" | "success" | "danger" | "neutral" {
+function statusTone(status: string): "brand" | "success" | "warning" | "danger" | "neutral" {
   if (status === "confirmed" || status === "pending_confirmation") return "brand";
   if (status === "completed") return "success";
+  if (status === "pending_payment") return "warning";
   if (status === "cancelled") return "danger";
   return "neutral";
+}
+
+/** `pending_payment` is a live hold, not a booking the admin should act on
+ * — and `expired` is one that lapsed. Neither reads well as the raw enum. */
+function statusLabel(status: string): string {
+  if (status === "pending_payment") return "awaiting payment";
+  return status.replace("_", " ");
 }
 
 export function BookingsManager({ adminId }: { adminId: string }) {
@@ -177,7 +187,7 @@ export function BookingsManager({ adminId }: { adminId: string }) {
                             {formatInTimeZone(new Date(booking.start_time), IST, "MMM d, h:mm a")}
                           </td>
                           <td className="px-6 py-3.5" onClick={() => setSelected(booking)}>
-                            <Badge tone={statusTone(booking.status)}>{booking.status.replace("_", " ")}</Badge>
+                            <Badge tone={statusTone(booking.status)}>{statusLabel(booking.status)}</Badge>
                           </td>
                           <td className="px-6 py-3.5 whitespace-nowrap" onClick={() => setSelected(booking)}>
                             {booking.amount_due === null ? (

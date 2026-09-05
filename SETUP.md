@@ -17,6 +17,7 @@ Things needed from your side to get the current build running and testable. Grow
   - `0009_admin_profile.sql` — public profile fields (photo, headline, about, LinkedIn, Instagram), the accepting-bookings toggle, minimum-notice and booking-window settings, the `admin-photos` Storage bucket + its policies, and the public RPCs the new profile page uses
   - `0010_booking_enquiries.sql` — the `booking_enquiries` table (leads captured while an admin has bookings paused) and its public submission RPC; also re-creates `create_public_booking` so the toggle, minimum notice and booking window are enforced server-side, not just hidden in the UI
   - `0011_discount_codes.sql` — discount codes + which event types each one covers, price columns on `bookings`, the advisory `validate_discount_code` RPC, and a `create_public_booking` that prices the booking and redeems the code server-side
+  - `0012_payments_and_magic_link.sql` — Razorpay columns + the `manage_token` magic link, the `pending_payment`/`expired` statuses and the new `payment_status` vocabulary (existing `paid_dummy` rows are folded into `paid`), and the RPCs behind booking creation, payment confirmation and hold expiry. **`create_public_booking` is revoked from anonymous callers here** — the public page now goes through the `create-booking` Edge Function instead
 
 After running `0009`, confirm the bucket exists: Supabase Dashboard → Storage → you should see **`admin-photos`** (public, 2 MB limit, JPG/PNG/WebP only). The migration creates it, so there's nothing to click — this is just a check.
 
@@ -147,6 +148,31 @@ Visit `http://localhost:3000` — you should land on `/login`.
 38. Deactivate a code → confirm it's rejected on the public page and shows **Inactive**.
 39. Book with a discount → check **Bookings**: the Amount column should show the discounted total with a `−20%` marker.
 40. Race check (optional): with a max-uses-1 code, submit two bookings at once from two tabs → exactly one should succeed.
+
+---
+
+## Razorpay (test mode)
+
+Before testing payments:
+
+- [ ] `NEXT_PUBLIC_RAZORPAY_KEY_ID` in `.env.local` (done)
+- [ ] `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET` and `PUBLIC_BASE_URL` as Edge Function secrets — see [`supabase/functions/README.md`](supabase/functions/README.md)
+- [ ] Deploy `create-booking`, `verify-razorpay-payment`, `razorpay-webhook`, `expire-pending-bookings`, and re-deploy `relay-booking-to-n8n`
+- [ ] Add the webhook in the Razorpay dashboard (URL + secret + the three events) — steps in the functions README
+- [ ] **Change the existing Supabase Database Webhook on `bookings` to fire on `INSERT` *and* `UPDATE`** (Dashboard → Database → Webhooks → edit the one pointing at `relay-booking-to-n8n`)
+- [ ] Import and activate `n8n/workflows/expire-holds-cron.json`
+
+Razorpay test cards/UPI: use card `4111 1111 1111 1111` with any future expiry and any CVV, or pick UPI and choose "Success" on the simulated screen. Full list: <https://razorpay.com/docs/payments/payments/test-card-details/>
+
+**Payments**
+41. Book a paid session → after "Continue to payment" the Razorpay modal should open showing UPI, cards, netbanking and wallets → pay with a test card → confirmation shows the amount, and the booking lands in the dashboard as **confirmed**.
+42. Check the client's inbox — the confirmation email should arrive **once**, and contain the magic link. Open it: the booking details page should render.
+43. Start a paid booking and **close the Razorpay modal** without paying → you should see "your slot is held for a few more minutes", the booking sits in the dashboard as **awaiting payment**, and that slot is gone from the public page.
+44. Wait ~10 minutes (or run the n8n workflow manually) → the booking flips to **expired** and the slot comes back. If a discount code was applied, its `times_used` should tick back down.
+45. Pay, then immediately reload the dashboard → confirm exactly one confirmed booking and no duplicate email.
+46. Use a **100% discount code** on a paid session → Razorpay should be skipped entirely and the booking confirmed as free.
+47. Webhook check: Razorpay Dashboard → Webhooks → your webhook → recent deliveries should show `payment.captured` with a 200. Then in Supabase, `razorpay_payment_id` and `amount_paid` should be filled in on the booking.
+48. Tamper check (worth doing once): with a paid event, use browser devtools to call the `create-booking` function with an extra `amount` field — confirm it's ignored and you're still charged the real price.
 
 ---
 

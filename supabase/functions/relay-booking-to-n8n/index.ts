@@ -1,8 +1,18 @@
 // Supabase Edge Function: relay-booking-to-n8n
 //
-// Triggered by a Supabase Database Webhook on INSERT into `bookings` (set
-// this up in Supabase Dashboard → Database → Webhooks — see
-// supabase/functions/README.md). Looks up the admin + event type, refreshes
+// Triggered by a Supabase Database Webhook on INSERT **or UPDATE** of
+// `bookings` (set this up in Supabase Dashboard → Database → Webhooks — see
+// supabase/functions/README.md). UPDATE matters now that paid bookings are
+// inserted as 'pending_payment' and only become 'confirmed' once payment is
+// verified: firing on INSERT alone would have emailed the client before
+// they paid, and not at all afterwards.
+//
+// The guard for that is below — this returns early unless the booking is
+// confirmed and hasn't been announced yet, and claims the send by flipping
+// `confirmation_sent` before dispatching, so a burst of updates can't
+// produce duplicate emails.
+//
+// Looks up the admin + event type, refreshes
 // the admin's Google access token if they've connected Calendar, and hands
 // everything off to the n8n webhook, which does the actual Calendar/Meet
 // creation and sends the confirmation email.
@@ -14,7 +24,7 @@
 //   supabase functions deploy relay-booking-to-n8n --no-verify-jwt
 // Required secrets: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY,
 //   GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, N8N_BOOKING_WEBHOOK_URL,
-//   BOOKING_WEBHOOK_SECRET
+//   BOOKING_WEBHOOK_SECRET, PUBLIC_BASE_URL
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { corsHeaders, jsonResponse } from "../_shared/cors.ts";
@@ -24,6 +34,9 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const N8N_BOOKING_WEBHOOK_URL = Deno.env.get("N8N_BOOKING_WEBHOOK_URL")!;
 const BOOKING_WEBHOOK_SECRET = Deno.env.get("BOOKING_WEBHOOK_SECRET")!;
+// Where the app is reachable from, for building the client's magic link.
+// Falls back to localhost so a local test still produces a usable URL.
+const PUBLIC_BASE_URL = (Deno.env.get("PUBLIC_BASE_URL") ?? "http://localhost:3000").replace(/\/$/, "");
 
 /** Formats an ISO instant for display in a given IANA timezone, e.g.
  * "04 Sep 2026, 12:00 PM" — computed once here so every downstream channel
@@ -68,6 +81,28 @@ Deno.serve(async (req) => {
 
   const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
 
+  // Only confirmed bookings get announced. A 'pending_payment' insert, a
+  // cancellation, a lead-note edit — all land here and all stop at this
+  // line.
+  if (booking.status !== "confirmed") {
+    return jsonResponse({ skipped: "not confirmed", status: booking.status });
+  }
+
+  // Claim the send atomically: the UPDATE only matches while
+  // confirmation_sent is still false, so of two concurrent deliveries for
+  // the same booking exactly one proceeds past here.
+  const { data: claimed } = await supabase
+    .from("bookings")
+    .update({ confirmation_sent: true })
+    .eq("id", booking.id)
+    .eq("confirmation_sent", false)
+    .select("id, manage_token")
+    .maybeSingle();
+
+  if (!claimed) {
+    return jsonResponse({ skipped: "already sent" });
+  }
+
   const { data: admin } = await supabase
     .from("admins")
     .select("id, name, email, phone, timezone, google_calendar_connected, google_refresh_token, notification_config")
@@ -103,6 +138,12 @@ Deno.serve(async (req) => {
         client_phone: booking.client_phone,
         client_timezone: booking.client_timezone,
         custom_answers: booking.custom_answers,
+        // Where the client manages this booking (view details, request a
+        // reschedule or cancellation). Include this in the confirmation
+        // email/WhatsApp template.
+        manage_link: `${PUBLIC_BASE_URL}/booking/${claimed.manage_token}`,
+        amount_paid: booking.amount_paid,
+        payment_status: booking.payment_status,
       },
       admin: admin ? { id: admin.id, name: admin.name, email: admin.email, phone: admin.phone, timezone: admin.timezone } : null,
       event_type: eventType ? { name: eventType.name, duration_minutes: eventType.duration_minutes } : null,

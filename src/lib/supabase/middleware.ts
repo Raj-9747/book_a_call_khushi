@@ -1,7 +1,9 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-const PUBLIC_ROUTE_PREFIXES = ["/book", "/login"];
+// `/booking` is the client's magic link — authorized by the unguessable
+// token in the URL, not by a login.
+const PUBLIC_ROUTE_PREFIXES = ["/book", "/booking", "/login"];
 
 function isPublicRoute(pathname: string) {
   return (

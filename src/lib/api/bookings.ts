@@ -41,7 +41,10 @@ export async function cancelBooking(id: string): Promise<void> {
     // Ignore — cancellation still proceeds below regardless.
   }
 
-  const { error } = await supabase.from("bookings").update({ status: "cancelled" }).eq("id", id);
+  const { error } = await supabase
+    .from("bookings")
+    .update({ status: "cancelled", cancelled_by: "admin" })
+    .eq("id", id);
   if (error) throw error;
 }
 

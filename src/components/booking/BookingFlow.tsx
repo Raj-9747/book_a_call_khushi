@@ -9,16 +9,17 @@ import { computeAvailableSlots } from "@/lib/availability/computeSlots";
 import {
   getBusyRanges,
   getGoogleBusyRanges,
-  createPublicBooking,
+  createBooking,
+  verifyPayment,
   type PublicAdmin,
   type PublicEventType,
 } from "@/lib/api/publicBooking";
+import { openRazorpayCheckout } from "@/lib/payments/razorpay";
 import type { BookingDetailsValues } from "@/lib/validations/publicBooking";
 import { AdminProfileHeader } from "./AdminProfileHeader";
 import { DateSlotPicker } from "./DateSlotPicker";
 import { BookingDetailsForm } from "./BookingDetailsForm";
 import { DiscountBox, type AppliedDiscount } from "./DiscountBox";
-import { DummyPaymentButton } from "./DummyPaymentButton";
 import { ConfirmationCard } from "./ConfirmationCard";
 
 function formatAmount(amount: number) {
@@ -84,9 +85,12 @@ export function BookingFlow({ admin, eventType }: { admin: PublicAdmin; eventTyp
     if (!selectedSlot) return;
     setSubmitting(true);
     try {
-      const booking = await createPublicBooking({
-        adminId: admin.id,
-        eventTypeId: eventType.id,
+      // Creates the booking and, when there's something to charge, the
+      // matching Razorpay order. The amount comes back from the server —
+      // it's never sent up.
+      const result = await createBooking({
+        adminSlug: admin.slug,
+        eventSlug: eventType.slug,
         clientName: finalDetails.name,
         clientEmail: finalDetails.email,
         clientPhone: finalDetails.phone,
@@ -95,10 +99,54 @@ export function BookingFlow({ admin, eventType }: { admin: PublicAdmin; eventTyp
         clientTimezone: visitorTimeZone,
         discountCode: discount?.code ?? null,
       });
+
+      if (result.free) {
+        setModalOpen(false);
+        setConfirmed({ startTime: new Date(result.start_time), amountPaid: 0 });
+        return;
+      }
+
+      // From here the slot is held for a few minutes. If the client
+      // abandons Checkout the hold lapses on its own and the slot frees.
+      const checkout = await openRazorpayCheckout({
+        keyId: result.key_id,
+        orderId: result.order_id,
+        amountInPaise: result.amount_in_paise,
+        currency: result.currency,
+        name: admin.name,
+        description: eventType.name,
+        prefill: { name: finalDetails.name, email: finalDetails.email, contact: finalDetails.phone },
+      });
+
+      const verified = await verifyPayment({
+        bookingId: result.booking_id,
+        orderId: checkout.razorpay_order_id,
+        paymentId: checkout.razorpay_payment_id,
+        signature: checkout.razorpay_signature,
+      });
+
       setModalOpen(false);
-      setConfirmed({ startTime: new Date(booking.start_time), amountPaid: booking.amount_due });
+      setConfirmed({ startTime: new Date(result.start_time), amountPaid: result.amount_due });
+
+      // Rare, but it can happen: the hold lapsed while the payment was
+      // being captured and someone else took the slot. Say so plainly
+      // rather than letting them find out at call time.
+      if (verified.slot_conflict) {
+        toast.error(
+          `${admin.name} will get in touch — that slot was taken while your payment went through, so it needs rescheduling.`,
+          { duration: 12000 }
+        );
+      }
     } catch (err) {
       const message = err instanceof Error ? err.message : "Failed to complete booking";
+
+      // Dismissing the Checkout modal isn't an error worth shouting about;
+      // the hold is still live, so they can just press pay again.
+      if (message === "Payment cancelled.") {
+        toast.info("Payment cancelled — your slot is held for a few more minutes.");
+        return;
+      }
+
       toast.error(message);
 
       // The slot may have just been taken by someone else — send them back
@@ -106,6 +154,7 @@ export function BookingFlow({ admin, eventType }: { admin: PublicAdmin; eventTyp
       if (message.includes("just booked") || message.includes("too soon") || message.includes("too far")) {
         setModalOpen(false);
         setSelectedSlot(null);
+        setDetails(null);
       }
       // A code that passed the advisory pre-check can still be rejected at
       // booking time (it expired, or someone else took the last use).
@@ -235,7 +284,12 @@ export function BookingFlow({ admin, eventType }: { admin: PublicAdmin; eventTyp
                 <span>{formatAmount(total)}</span>
               </div>
             </div>
-            <DummyPaymentButton price={total} onPaid={() => submitBooking(details)} />
+            <Button className="w-full" size="lg" isLoading={submitting} onClick={() => submitBooking(details)}>
+              Pay {formatAmount(total)}
+            </Button>
+            <p className="text-center text-xs text-neutral-400">
+              Pay securely by UPI, card, netbanking or wallet via Razorpay.
+            </p>
             <button
               type="button"
               disabled={submitting}

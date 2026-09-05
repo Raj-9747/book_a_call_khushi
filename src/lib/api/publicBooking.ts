@@ -149,8 +149,8 @@ export async function validateDiscountCode(
 }
 
 export interface CreateBookingInput {
-  adminId: string;
-  eventTypeId: string;
+  adminSlug: string;
+  eventSlug: string;
   clientName: string;
   clientEmail: string;
   clientPhone: string;
@@ -160,29 +160,97 @@ export interface CreateBookingInput {
   discountCode?: string | null;
 }
 
-export interface CreatedBooking {
-  id: string;
+/** A booking that needed no payment — already confirmed. */
+export interface FreeBookingResult {
+  free: true;
+  booking_id: string;
   start_time: string;
-  end_time: string;
-  status: string;
-  amount_due: number;
+  amount_due: 0;
+  manage_token: string;
 }
 
-export async function createPublicBooking(input: CreateBookingInput): Promise<CreatedBooking> {
+/** A booking holding its slot until the Razorpay order is paid. */
+export interface PendingBookingResult {
+  free: false;
+  booking_id: string;
+  start_time: string;
+  amount_due: number;
+  order_id: string;
+  amount_in_paise: number;
+  currency: string;
+  key_id: string;
+}
+
+export type CreateBookingResult = FreeBookingResult | PendingBookingResult;
+
+/** Unwraps an Edge Function error into the message the function actually
+ * sent. `functions.invoke` reports a non-2xx as a generic
+ * FunctionsHttpError, with the useful text only in the response body. */
+async function edgeFunctionError(error: unknown, fallback: string): Promise<Error> {
+  const context = (error as { context?: Response })?.context;
+  if (context && typeof context.json === "function") {
+    try {
+      const body = await context.json();
+      if (body?.error) return new Error(body.error);
+    } catch {
+      /* Body wasn't JSON — fall through to the generic message. */
+    }
+  }
+  return new Error(error instanceof Error && error.message ? error.message : fallback);
+}
+
+/** Creates the booking server-side.
+ *
+ * Goes through an Edge Function rather than an RPC because a paid booking
+ * and its Razorpay order have to be created together, with the amount
+ * derived from the database. No price is sent from here — there's
+ * deliberately no field for one. */
+export async function createBooking(input: CreateBookingInput): Promise<CreateBookingResult> {
   const supabase = createClient();
-  const { data, error } = await supabase.rpc("create_public_booking", {
-    p_admin_id: input.adminId,
-    p_event_type_id: input.eventTypeId,
-    p_client_name: input.clientName,
-    p_client_email: input.clientEmail,
-    p_client_phone: input.clientPhone || null,
-    p_custom_answers: input.customAnswers,
-    p_start_time: input.startTime.toISOString(),
-    p_client_timezone: input.clientTimezone,
-    p_discount_code: input.discountCode?.trim() || null,
+  const { data, error } = await supabase.functions.invoke("create-booking", {
+    body: {
+      admin_slug: input.adminSlug,
+      event_slug: input.eventSlug,
+      client_name: input.clientName,
+      client_email: input.clientEmail,
+      client_phone: input.clientPhone || null,
+      custom_answers: input.customAnswers,
+      start_time: input.startTime.toISOString(),
+      client_timezone: input.clientTimezone,
+      discount_code: input.discountCode?.trim() || null,
+    },
   });
-  if (error) throw error;
-  const row = data?.[0];
-  if (!row) throw new Error("Booking failed — please try again.");
-  return { ...row, amount_due: Number(row.amount_due) };
+
+  if (error) throw await edgeFunctionError(error, "Failed to create the booking.");
+  if (data?.error) throw new Error(data.error);
+  return data as CreateBookingResult;
+}
+
+export interface VerifyPaymentResult {
+  confirmed: boolean;
+  manage_token: string;
+  slot_conflict: boolean;
+}
+
+/** Relays Checkout's response for server-side signature verification. The
+ * booking is only confirmed if that check passes. */
+export async function verifyPayment(input: {
+  bookingId: string;
+  orderId: string;
+  paymentId: string;
+  signature: string;
+}): Promise<VerifyPaymentResult> {
+  const supabase = createClient();
+  const { data, error } = await supabase.functions.invoke("verify-razorpay-payment", {
+    body: {
+      booking_id: input.bookingId,
+      razorpay_order_id: input.orderId,
+      razorpay_payment_id: input.paymentId,
+      razorpay_signature: input.signature,
+    },
+  });
+
+  if (error) throw await edgeFunctionError(error, "Couldn't verify your payment.");
+  if (data?.error) throw new Error(data.error);
+  return data as VerifyPaymentResult;
 }

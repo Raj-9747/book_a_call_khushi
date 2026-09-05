@@ -17,6 +17,7 @@ This folder holds the exported n8n workflow JSON files that power Zaptly's calen
 |---|---|---|---|
 | `workflows/create-booking-event.json` | Webhook (called by the `relay-booking-to-n8n` Supabase Edge Function on every new booking) | If the admin has Google Calendar connected: creates the event with a Meet link, attaches both client + admin as attendees, writes `meet_link`/`google_event_id` back to the booking. Either way, sends a confirmation email to the client AND a separate "you got a new booking" notification email to the admin via Gmail — the admin is the event's *organizer* on their own calendar, so Google doesn't email organizers the way it emails guests, which is why this explicit admin email exists. | Built — needs your credentials wired up |
 | `workflows/reminder-cron.json` | Schedule (every 10 min) | Finds confirmed bookings starting in ~1 hour that haven't been reminded yet, sends a reminder email, marks `reminder_sent = true`. | Built — needs your credentials wired up |
+| `workflows/expire-holds-cron.json` | Schedule (every 5 min) | Calls the `expire-pending-bookings` Edge Function, which releases abandoned Razorpay checkouts and hands back any discount-code use they consumed. No credentials needed beyond `BOOKING_WEBHOOK_SECRET`. | Built |
 
 ## Getting the booking-created webhook URL into Supabase
 
@@ -26,7 +27,8 @@ This folder holds the exported n8n workflow JSON files that power Zaptly's calen
 4. Generate a random secret: `openssl rand -hex 32` — this is what stops anyone else from triggering your relay endpoint. Set it as an Edge Function secret too: `supabase secrets set BOOKING_WEBHOOK_SECRET=<that random string>`.
 5. Deploy the relay function: `supabase functions deploy relay-booking-to-n8n --no-verify-jwt`
 6. In Supabase Dashboard → Database → Webhooks → Create a new webhook:
-   - Table: `bookings`, Events: `INSERT` only
+   - Table: `bookings`, Events: **`INSERT` and `UPDATE`**
+     (UPDATE is required now that paid bookings are inserted as `pending_payment` and only become `confirmed` once payment clears — INSERT alone would email the client before they'd paid, and never afterwards. The relay function ignores everything that isn't a newly-confirmed booking, and marks `confirmation_sent` before dispatching so an update storm can't send twice.)
    - Type: **Supabase Edge Functions** → select `relay-booking-to-n8n`
    - Add an HTTP header: `x-webhook-secret` = the same random string from step 4
 
