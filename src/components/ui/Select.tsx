@@ -24,9 +24,23 @@ interface SelectProps {
 // native <select>'s open option list itself (no CSS control over it), which
 // looks jarringly out-of-place next to the rest of the design system. This
 // draws its own portal-rendered listbox instead, styled like everything else.
+const MAX_LIST_HEIGHT = 256; // matches the old max-h-64
+const VIEWPORT_MARGIN = 8;
+
+interface Position {
+  left: number;
+  width: number;
+  maxHeight: number;
+  // Exactly one of these is set — anchoring from the trigger's bottom edge
+  // (normal case) or its top edge (flipped, when there's more room above
+  // than below, e.g. a select near the bottom of a modal).
+  top?: number;
+  bottom?: number;
+}
+
 export function Select({ value, onChange, options, disabled, error, className, placeholder }: SelectProps) {
   const [open, setOpen] = useState(false);
-  const [position, setPosition] = useState<{ top: number; left: number; width: number } | null>(null);
+  const [position, setPosition] = useState<Position | null>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
 
@@ -34,7 +48,34 @@ export function Select({ value, onChange, options, disabled, error, className, p
 
   function openMenu() {
     const rect = triggerRef.current?.getBoundingClientRect();
-    if (rect) setPosition({ top: rect.bottom + 4, left: rect.left, width: rect.width });
+    if (!rect) {
+      setOpen(true);
+      return;
+    }
+
+    const spaceBelow = window.innerHeight - rect.bottom - VIEWPORT_MARGIN;
+    const spaceAbove = rect.top - VIEWPORT_MARGIN;
+
+    // Only flip upward if there's truly not enough room below AND flipping
+    // actually helps — otherwise a select near the top of a short viewport
+    // would flip for no gain and just as easily run off the top instead.
+    const shouldFlip = spaceBelow < MAX_LIST_HEIGHT && spaceAbove > spaceBelow;
+
+    setPosition(
+      shouldFlip
+        ? {
+            bottom: window.innerHeight - rect.top + 4,
+            left: rect.left,
+            width: rect.width,
+            maxHeight: Math.max(Math.min(spaceAbove, MAX_LIST_HEIGHT), 120),
+          }
+        : {
+            top: rect.bottom + 4,
+            left: rect.left,
+            width: rect.width,
+            maxHeight: Math.max(Math.min(spaceBelow, MAX_LIST_HEIGHT), 120),
+          }
+    );
     setOpen(true);
   }
 
@@ -90,8 +131,15 @@ export function Select({ value, onChange, options, disabled, error, className, p
         createPortal(
           <div
             ref={listRef}
-            style={{ position: "fixed", top: position.top, left: position.left, width: position.width }}
-            className="z-50 max-h-64 overflow-y-auto rounded-md border border-border bg-surface py-1 shadow-lg"
+            style={{
+              position: "fixed",
+              top: position.top,
+              bottom: position.bottom,
+              left: position.left,
+              width: position.width,
+              maxHeight: position.maxHeight,
+            }}
+            className="z-50 overflow-y-auto rounded-md border border-border bg-surface py-1 shadow-lg"
           >
             {options.map((opt) => (
               <button

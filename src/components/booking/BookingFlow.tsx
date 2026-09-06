@@ -32,6 +32,11 @@ export function BookingFlow({ admin, eventType }: { admin: PublicAdmin; eventTyp
   const [discount, setDiscount] = useState<AppliedDiscount | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [details, setDetails] = useState<BookingDetailsValues | null>(null);
+  // Separate from `details` on purpose: "Back to your details" used to
+  // null out `details` itself to switch views, which also wiped the exact
+  // values the form needed to pre-fill with. This just toggles which half
+  // of the modal shows — `details` stays intact as the form's defaults.
+  const [showPaymentStep, setShowPaymentStep] = useState(false);
   const [customAnswers, setCustomAnswers] = useState<Record<string, string>>({});
   const [confirmed, setConfirmed] = useState<{ startTime: Date; amountPaid: number } | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -266,7 +271,7 @@ export function BookingFlow({ admin, eventType }: { admin: PublicAdmin; eventTyp
             : undefined
         }
       >
-        {details && total > 0 ? (
+        {showPaymentStep && details && total > 0 ? (
           <div className="space-y-4">
             <div className="space-y-2 rounded-lg bg-neutral-50 px-4 py-3 text-sm">
               <div className="flex justify-between text-neutral-600">
@@ -293,7 +298,7 @@ export function BookingFlow({ admin, eventType }: { admin: PublicAdmin; eventTyp
             <button
               type="button"
               disabled={submitting}
-              onClick={() => setDetails(null)}
+              onClick={() => setShowPaymentStep(false)}
               className="w-full text-sm text-neutral-500 transition-colors hover:text-neutral-900 disabled:opacity-50"
             >
               Back to your details
@@ -303,10 +308,13 @@ export function BookingFlow({ admin, eventType }: { admin: PublicAdmin; eventTyp
           <BookingDetailsForm
             eventType={eventType}
             submitLabel={total > 0 ? `Continue to payment · ${formatAmount(total)}` : "Confirm booking"}
+            defaultValues={details ?? undefined}
+            defaultCustomAnswers={customAnswers}
             onSubmit={(values, answers) => {
               setDetails(values);
               setCustomAnswers(answers);
               if (total === 0) submitBooking(values);
+              else setShowPaymentStep(true);
             }}
           />
         )}

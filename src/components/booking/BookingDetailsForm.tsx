@@ -10,20 +10,27 @@ import type { PublicEventType } from "@/lib/api/publicBooking";
 export function BookingDetailsForm({
   eventType,
   submitLabel,
+  defaultValues,
+  defaultCustomAnswers,
   onSubmit,
 }: {
   eventType: PublicEventType;
   submitLabel: string;
+  /** Re-populates the form when the client comes back to edit details —
+   * e.g. from the payment step's "Back to your details" — instead of
+   * making them retype everything from a blank form. */
+  defaultValues?: BookingDetailsValues;
+  defaultCustomAnswers?: Record<string, string>;
   onSubmit: (details: BookingDetailsValues, customAnswers: Record<string, string>) => void;
 }) {
-  const [customAnswers, setCustomAnswers] = useState<Record<string, string>>({});
+  const [customAnswers, setCustomAnswers] = useState<Record<string, string>>(defaultCustomAnswers ?? {});
   const [customErrors, setCustomErrors] = useState<Record<string, string>>({});
 
   const {
     register,
     handleSubmit,
     formState: { errors },
-  } = useForm<BookingDetailsValues>({ resolver: zodResolver(bookingDetailsSchema) });
+  } = useForm<BookingDetailsValues>({ resolver: zodResolver(bookingDetailsSchema), defaultValues });
 
   function handleFormSubmit(values: BookingDetailsValues) {
     const nextErrors: Record<string, string> = {};
