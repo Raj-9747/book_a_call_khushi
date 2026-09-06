@@ -4,6 +4,7 @@ import { CalendarDays, Clock, Video } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { Avatar, Badge } from "@/components/ui";
 import { getBookingByToken } from "@/lib/api/manageBooking";
+import { ManageBookingActions } from "@/components/booking/ManageBookingActions";
 
 export const metadata: Metadata = {
   title: "Your booking",
@@ -125,6 +126,8 @@ export default async function ManageBookingPage({ params }: { params: Promise<{ 
                 This booking was cancelled. If that wasn&apos;t expected, reply to your confirmation email.
               </p>
             )}
+
+            <ManageBookingActions booking={booking} token={token} />
           </div>
         </div>
 

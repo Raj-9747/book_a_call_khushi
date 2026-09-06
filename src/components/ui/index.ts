@@ -15,3 +15,4 @@ export * from "./Switch";
 export * from "./Checkbox";
 export * from "./TimeInput";
 export * from "./DatePicker";
+export * from "./Pagination";

@@ -13,11 +13,15 @@ export function AppShell({
   section,
   userName,
   userRole,
+  pendingRequestsCount = 0,
   children,
 }: {
   section: NavSection;
   userName: string;
   userRole: string;
+  /** Shown as a badge on the "Requests" nav item. Fetched server-side in
+   * the layout so it's ready on first paint, not a client-side afterthought. */
+  pendingRequestsCount?: number;
   children: React.ReactNode;
 }) {
   const navItems = NAV_ITEMS_BY_SECTION[section];
@@ -106,7 +110,12 @@ export function AppShell({
                 )}
               >
                 <Icon className="h-4 w-4" />
-                {item.label}
+                <span className="flex-1">{item.label}</span>
+                {item.href === "/dashboard/requests" && pendingRequestsCount > 0 && (
+                  <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-brand-600 px-1.5 text-xs font-semibold text-white">
+                    {pendingRequestsCount}
+                  </span>
+                )}
               </Link>
             );
           })}

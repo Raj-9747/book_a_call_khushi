@@ -20,6 +20,7 @@ These run server-side with the `service_role` key (never exposed to the browser)
 | `verify-razorpay-payment` | The browser's fast path after Checkout succeeds. Verifies the `order_id\|payment_id` HMAC against `RAZORPAY_KEY_SECRET`, confirms the booking, and returns the magic-link token. Not authoritative on its own |
 | `razorpay-webhook` | The authoritative payment channel — Razorpay calls it server-to-server, so it works even if the client's browser never returns. Authorized by the `X-Razorpay-Signature` HMAC over the **raw** body. Handles `payment.captured`, `payment.failed`, `refund.processed`. Idempotent with the function above |
 | `expire-pending-bookings` | Called every 5 minutes by n8n — releases lapsed payment holds and refunds the discount-code uses they consumed. Authorized by `x-webhook-secret` |
+| `refund-razorpay-payment` | Called from the admin's Requests page when they approve a cancellation with a refund attached. The only part of the requests flow that needs the Razorpay secret — everything else (approve/reject, reschedule) is a plain RLS-guarded table write from the browser |
 
 ## One-time setup (do this once you have the Supabase CLI installed)
 
@@ -72,6 +73,7 @@ supabase functions deploy create-booking --no-verify-jwt
 supabase functions deploy verify-razorpay-payment --no-verify-jwt
 supabase functions deploy razorpay-webhook --no-verify-jwt
 supabase functions deploy expire-pending-bookings --no-verify-jwt
+supabase functions deploy refund-razorpay-payment
 ```
 
 ## Razorpay webhook setup

@@ -1,4 +1,4 @@
-import { type LucideIcon, CalendarCheck, Clock, LayoutDashboard, ListChecks, Settings, Tag, UserRound, Users } from "lucide-react";
+import { type LucideIcon, CalendarCheck, Clock, Inbox, LayoutDashboard, ListChecks, Settings, Tag, UserRound, Users } from "lucide-react";
 
 export interface NavItem {
   label: string;
@@ -17,6 +17,7 @@ export const NAV_ITEMS_BY_SECTION = {
   dashboard: [
     { label: "Overview", href: "/dashboard", icon: LayoutDashboard },
     { label: "Bookings", href: "/dashboard/bookings", icon: CalendarCheck },
+    { label: "Requests", href: "/dashboard/requests", icon: Inbox },
     { label: "Event types", href: "/dashboard/event-types", icon: ListChecks },
     { label: "Availability", href: "/dashboard/availability", icon: Clock },
     { label: "Discounts", href: "/dashboard/discounts", icon: Tag },

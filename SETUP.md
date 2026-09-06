@@ -18,6 +18,7 @@ Things needed from your side to get the current build running and testable. Grow
   - `0010_booking_enquiries.sql` — the `booking_enquiries` table (leads captured while an admin has bookings paused) and its public submission RPC; also re-creates `create_public_booking` so the toggle, minimum notice and booking window are enforced server-side, not just hidden in the UI
   - `0011_discount_codes.sql` — discount codes + which event types each one covers, price columns on `bookings`, the advisory `validate_discount_code` RPC, and a `create_public_booking` that prices the booking and redeems the code server-side
   - `0012_payments_and_magic_link.sql` — Razorpay columns + the `manage_token` magic link, the `pending_payment`/`expired` statuses and the new `payment_status` vocabulary (existing `paid_dummy` rows are folded into `paid`), and the RPCs behind booking creation, payment confirmation and hold expiry. **`create_public_booking` is revoked from anonymous callers here** — the public page now goes through the `create-booking` Edge Function instead
+  - `0013_booking_change_requests.sql` — the `booking_change_requests` table (reschedule/cancel requests from the magic-link page), its public submission RPC, and a `get_booking_by_token` that also returns the admin's availability data (so the magic link can offer a real slot picker when proposing a reschedule) and any existing request on that booking
 
 After running `0009`, confirm the bucket exists: Supabase Dashboard → Storage → you should see **`admin-photos`** (public, 2 MB limit, JPG/PNG/WebP only). The migration creates it, so there's nothing to click — this is just a check.
 
@@ -173,6 +174,30 @@ Razorpay test cards/UPI: use card `4111 1111 1111 1111` with any future expiry a
 46. Use a **100% discount code** on a paid session → Razorpay should be skipped entirely and the booking confirmed as free.
 47. Webhook check: Razorpay Dashboard → Webhooks → your webhook → recent deliveries should show `payment.captured` with a 200. Then in Supabase, `razorpay_payment_id` and `amount_paid` should be filled in on the booking.
 48. Tamper check (worth doing once): with a paid event, use browser devtools to call the `create-booking` function with an extra `amount` field — confirm it's ignored and you're still charged the real price.
+
+---
+
+## Reschedule/cancellation requests (needs migration `0013` + `refund-razorpay-payment` deployed)
+
+49. Run `0013_booking_change_requests.sql`, then `supabase functions deploy refund-razorpay-payment`.
+50. Make a confirmed booking, open its magic link from the confirmation email → confirm you see **Request reschedule** and **Request cancellation** buttons at the bottom.
+51. Click **Request reschedule** → a slot picker should load (same one as the public booking page) → optionally pick a time and add a message → Send. Confirm the page now shows "your request has been sent" instead of the buttons, and a second attempt is blocked with the same message rather than creating a duplicate.
+52. In the dashboard, check the **Requests** nav item — it should show a badge with a pending count, and the **Bookings** table should show a "Reschedule requested" tag on that row.
+53. Open **Requests** → click the request → approve it (either the proposed time, or pick a different one) → confirm: the booking's time updates, the Bookings table shows the new time, a fresh confirmation email goes out (since this reuses the existing pipeline), and — if Calendar is connected — the old event is gone and a new one exists at the new time.
+54. Repeat with **Request cancellation** on a paid booking → in Requests, try **No refund**, **Full refund**, and **Partial** on different test bookings → confirm the booking flips to cancelled, the Calendar event disappears, and for a refund, `refund_status`/`refund_amount` appear on the booking (check the Razorpay dashboard's Refunds tab too).
+55. Reject a request instead of approving → confirm the booking is untouched and the request shows as rejected.
+56. Try requesting a change on a booking whose call time has already passed → the buttons should be gone entirely.
+
+---
+
+## Bookings — sorting & pagination
+
+No migration needed — this is a frontend-only change (the list query is now server-side paginated/sorted/filtered instead of fetching every booking at once).
+
+57. Bookings page → a new **sort** dropdown next to the filters: Event date (newest/oldest), Booked on (newest/oldest). Switching it should reorder the table and jump back to page 1.
+58. With more than 20 bookings, confirm a **Prev/Next** pager appears at the bottom of the table showing "X–Y of Z", and paging through doesn't refetch everything — just the next slice.
+59. Type in the search box → confirm it doesn't fire a request on every keystroke (only after you pause typing), and that it also resets to page 1.
+60. Change the status or event-type filter while on page 2+ → confirm it jumps back to page 1 rather than showing an empty page.
 
 ---
 

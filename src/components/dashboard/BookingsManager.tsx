@@ -1,19 +1,32 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { formatInTimeZone } from "date-fns-tz";
 import { CheckCircle2, Search, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/layout/PageHeader";
-import { ActionsMenu, Badge, Input, Select, Spinner, useConfirm } from "@/components/ui";
-import { cancelBooking, listBookings, markBookingCompleted, type BookingWithEventType } from "@/lib/api/bookings";
+import { ActionsMenu, Badge, Input, Pagination, Select, Spinner, useConfirm } from "@/components/ui";
+import {
+  cancelBooking,
+  listBookings,
+  markBookingCompleted,
+  type BookingSortField,
+  type BookingWithEventType,
+} from "@/lib/api/bookings";
+import { listEventTypes } from "@/lib/api/eventTypes";
+import { listPendingRequestTypesByBooking, type ChangeRequestType } from "@/lib/api/changeRequests";
 import { cn } from "@/lib/utils";
+import type { EventType } from "@/types/models";
 import { EnquiriesTable } from "./EnquiriesTable";
 import { LeadDetailModal } from "./LeadDetailModal";
 
 type Tab = "bookings" | "enquiries";
 
 const IST = "Asia/Kolkata";
+const PAGE_SIZE = 20;
+// Debounces the search box so every keystroke doesn't fire its own query —
+// only the pause after typing does.
+const SEARCH_DEBOUNCE_MS = 350;
 
 const STATUS_OPTIONS = [
   { value: "all", label: "All statuses" },
@@ -22,6 +35,13 @@ const STATUS_OPTIONS = [
   { value: "cancelled", label: "Cancelled" },
   { value: "pending_payment", label: "Awaiting payment" },
   { value: "expired", label: "Expired" },
+];
+
+const SORT_OPTIONS: { value: string; label: string; field: BookingSortField; ascending: boolean }[] = [
+  { value: "event_desc", label: "Event date (newest first)", field: "start_time", ascending: false },
+  { value: "event_asc", label: "Event date (oldest first)", field: "start_time", ascending: true },
+  { value: "created_desc", label: "Booked on (newest first)", field: "created_at", ascending: false },
+  { value: "created_asc", label: "Booked on (oldest first)", field: "created_at", ascending: true },
 ];
 
 function statusTone(status: string): "brand" | "success" | "warning" | "danger" | "neutral" {
@@ -41,37 +61,95 @@ function statusLabel(status: string): string {
 
 export function BookingsManager({ adminId }: { adminId: string }) {
   const [bookings, setBookings] = useState<BookingWithEventType[] | null>(null);
+  const [totalCount, setTotalCount] = useState(0);
+  const [eventTypes, setEventTypes] = useState<EventType[]>([]);
   const [selected, setSelected] = useState<BookingWithEventType | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
-  const [search, setSearch] = useState("");
+
+  const [searchInput, setSearchInput] = useState("");
+  const [search, setSearch] = useState(""); // debounced value actually sent to the query
   const [statusFilter, setStatusFilter] = useState("all");
   const [eventTypeFilter, setEventTypeFilter] = useState("all");
+  const [sortValue, setSortValue] = useState(SORT_OPTIONS[0].value);
+  const [page, setPage] = useState(1);
+
   const [tab, setTab] = useState<Tab>("bookings");
+  const [pendingRequests, setPendingRequests] = useState<Map<string, ChangeRequestType>>(new Map());
   const confirm = useConfirm();
 
+  // Debounce the search box — only the pause after typing triggers a query.
+  // Resets to page 1 in the same beat: staying on, say, page 4 of a
+  // now-much-shorter result set would just show an empty page.
   useEffect(() => {
-    listBookings(adminId)
-      .then(setBookings)
-      .catch((err) => toast.error(err instanceof Error ? err.message : "Failed to load bookings"));
+    const timer = setTimeout(() => {
+      setSearch(searchInput);
+      setPage(1);
+    }, SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, [searchInput]);
+
+  // The other filters/sort aren't debounced, so their own onChange handlers
+  // reset the page directly — see handleStatusFilterChange etc. below.
+  function handleStatusFilterChange(value: string) {
+    setStatusFilter(value);
+    setPage(1);
+  }
+  function handleEventTypeFilterChange(value: string) {
+    setEventTypeFilter(value);
+    setPage(1);
+  }
+  function handleSortChange(value: string) {
+    setSortValue(value);
+    setPage(1);
+  }
+
+  useEffect(() => {
+    listEventTypes(adminId)
+      .then(setEventTypes)
+      .catch(() => {
+        /* Non-fatal — the filter dropdown just falls back to "All event types" only. */
+      });
+    listPendingRequestTypesByBooking(adminId)
+      .then(setPendingRequests)
+      .catch(() => {
+        /* Non-fatal — the badge is a convenience, not the source of truth
+         * (that's the Requests page itself). */
+      });
   }, [adminId]);
 
-  const eventTypeOptions = useMemo(() => {
-    const names = new Set((bookings ?? []).map((b) => b.event_types?.name).filter((n): n is string => !!n));
-    return [{ value: "all", label: "All event types" }, ...Array.from(names).map((name) => ({ value: name, label: name }))];
-  }, [bookings]);
+  useEffect(() => {
+    const sort = SORT_OPTIONS.find((o) => o.value === sortValue) ?? SORT_OPTIONS[0];
+    let cancelled = false;
 
-  const filteredBookings = useMemo(() => {
-    if (!bookings) return null;
-    const query = search.trim().toLowerCase();
-    return bookings.filter((b) => {
-      if (statusFilter !== "all" && b.status !== statusFilter) return false;
-      if (eventTypeFilter !== "all" && b.event_types?.name !== eventTypeFilter) return false;
-      if (query && !b.client_name.toLowerCase().includes(query) && !b.client_email.toLowerCase().includes(query)) {
-        return false;
-      }
-      return true;
-    });
-  }, [bookings, search, statusFilter, eventTypeFilter]);
+    listBookings(adminId, {
+      page,
+      pageSize: PAGE_SIZE,
+      sortField: sort.field,
+      sortAscending: sort.ascending,
+      search,
+      status: statusFilter,
+      eventTypeId: eventTypeFilter,
+    })
+      .then((result) => {
+        if (cancelled) return;
+        setBookings(result.bookings);
+        setTotalCount(result.totalCount);
+      })
+      .catch((err) => {
+        if (!cancelled) toast.error(err instanceof Error ? err.message : "Failed to load bookings");
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [adminId, page, sortValue, search, statusFilter, eventTypeFilter]);
+
+  const eventTypeOptions = [
+    { value: "all", label: "All event types" },
+    ...eventTypes.map((et) => ({ value: et.id, label: et.name })),
+  ];
+
+  const hasActiveFilters = search.trim() !== "" || statusFilter !== "all" || eventTypeFilter !== "all";
 
   async function handleCancel(booking: BookingWithEventType) {
     if (!(await confirm({ description: `Cancel the booking with ${booking.client_name}?`, tone: "danger" }))) return;
@@ -133,7 +211,7 @@ export function BookingsManager({ adminId }: { adminId: string }) {
           <div className="flex justify-center py-16">
             <Spinner className="h-6 w-6 text-neutral-400" />
           </div>
-        ) : bookings.length === 0 ? (
+        ) : totalCount === 0 && !hasActiveFilters ? (
           <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border-strong bg-surface py-16 text-center">
             <p className="text-sm font-medium text-neutral-900">No bookings yet</p>
             <p className="mt-1 text-sm text-neutral-500">Once clients book a call, they&apos;ll show up here.</p>
@@ -146,15 +224,16 @@ export function BookingsManager({ adminId }: { adminId: string }) {
                 <Input
                   placeholder="Search by name or email..."
                   className="pl-9"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
+                  value={searchInput}
+                  onChange={(e) => setSearchInput(e.target.value)}
                 />
               </div>
-              <Select className="sm:w-44" value={statusFilter} onChange={setStatusFilter} options={STATUS_OPTIONS} />
-              <Select className="sm:w-48" value={eventTypeFilter} onChange={setEventTypeFilter} options={eventTypeOptions} />
+              <Select className="sm:w-44" value={statusFilter} onChange={handleStatusFilterChange} options={STATUS_OPTIONS} />
+              <Select className="sm:w-48" value={eventTypeFilter} onChange={handleEventTypeFilterChange} options={eventTypeOptions} />
+              <Select className="sm:w-56" value={sortValue} onChange={handleSortChange} options={SORT_OPTIONS} />
             </div>
 
-            {filteredBookings && filteredBookings.length === 0 ? (
+            {bookings.length === 0 ? (
               <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border-strong bg-surface py-16 text-center">
                 <p className="text-sm font-medium text-neutral-900">No bookings match your filters</p>
                 <p className="mt-1 text-sm text-neutral-500">Try clearing the search or filters above.</p>
@@ -175,7 +254,7 @@ export function BookingsManager({ adminId }: { adminId: string }) {
                       </tr>
                     </thead>
                     <tbody>
-                      {filteredBookings?.map((booking) => (
+                      {bookings.map((booking) => (
                         <tr key={booking.id} className="cursor-pointer border-b border-border last:border-0 hover:bg-neutral-50">
                           <td className="px-6 py-3.5" onClick={() => setSelected(booking)}>
                             <p className="font-medium text-neutral-900">{booking.client_name}</p>
@@ -188,7 +267,16 @@ export function BookingsManager({ adminId }: { adminId: string }) {
                             {formatInTimeZone(new Date(booking.start_time), IST, "MMM d, h:mm a")}
                           </td>
                           <td className="px-6 py-3.5" onClick={() => setSelected(booking)}>
-                            <Badge tone={statusTone(booking.status)}>{statusLabel(booking.status)}</Badge>
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <Badge tone={statusTone(booking.status)}>{statusLabel(booking.status)}</Badge>
+                              {pendingRequests.has(booking.id) && (
+                                <Badge tone="warning">
+                                  {pendingRequests.get(booking.id) === "reschedule"
+                                    ? "Reschedule requested"
+                                    : "Cancellation requested"}
+                                </Badge>
+                              )}
+                            </div>
                           </td>
                           <td className="px-6 py-3.5 whitespace-nowrap" onClick={() => setSelected(booking)}>
                             {booking.amount_due === null ? (
@@ -227,6 +315,7 @@ export function BookingsManager({ adminId }: { adminId: string }) {
                     </tbody>
                   </table>
                 </div>
+                <Pagination page={page} pageSize={PAGE_SIZE} totalCount={totalCount} onPageChange={setPage} />
               </div>
             )}
           </>
