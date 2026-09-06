@@ -56,7 +56,12 @@ export function DateSlotPicker({
         })}
       </div>
 
-      <div className="mt-4 grid grid-cols-3 gap-2 sm:grid-cols-4">
+      {/* grid-cols-2 on narrow phones — 3 columns left too little width for
+          "10:00 AM" to fit on one line at this font size, so it wrapped
+          and squashed against the button's fixed height. whitespace-nowrap
+          is the actual guarantee; the column counts just make sure there's
+          room for it. */}
+      <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
         {daySlots.map((slot) => {
           const isSelected = selectedSlot?.getTime() === slot.getTime();
           return (
@@ -66,6 +71,7 @@ export function DateSlotPicker({
               size="sm"
               aria-pressed={isSelected}
               onClick={() => onSelect(slot)}
+              className="whitespace-nowrap"
             >
               {formatInTimeZone(slot, visitorTimeZone, "h:mm a")}
             </Button>

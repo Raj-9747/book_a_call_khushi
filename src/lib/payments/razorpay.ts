@@ -60,8 +60,14 @@ export interface CheckoutOptions {
  * success. Those are NOT proof of payment on their own — they're relayed to
  * `verify-razorpay-payment`, which checks the signature server-side.
  *
- * Rejects if the client dismisses the modal or the payment fails, so the
- * caller can leave them on the booking page to retry. */
+ * Rejects only if the client closes the modal without ever succeeding — a
+ * single failed attempt is NOT terminal. Checkout keeps itself open after a
+ * decline (e.g. "international cards not supported") and lets the client
+ * retry with a different method in the same session; settling the promise
+ * on that first failure would silently discard a *later* successful retry,
+ * since `handler` would fire against an already-settled promise. Razorpay's
+ * own UI already surfaces the failure reason inline, so there's nothing
+ * useful for this function to do with `payment.failed` beyond logging it. */
 export async function openRazorpayCheckout(options: CheckoutOptions): Promise<CheckoutSuccess> {
   await loadCheckoutScript();
   const Razorpay = window.Razorpay;
@@ -79,6 +85,10 @@ export async function openRazorpayCheckout(options: CheckoutOptions): Promise<Ch
       description: options.description,
       prefill: options.prefill,
       theme: { color: "#4f46e5" },
+      // Retrying with a different method after a decline keeps the modal
+      // open — the default, but explicit here so this isn't accidentally
+      // turned off later by someone tuning other options nearby.
+      retry: { enabled: true },
       modal: {
         ondismiss: () => {
           if (settled) return;
@@ -93,10 +103,9 @@ export async function openRazorpayCheckout(options: CheckoutOptions): Promise<Ch
     } as unknown as Record<string, unknown>);
 
     instance.on("payment.failed", (response: unknown) => {
-      if (settled) return;
-      settled = true;
-      const description = (response as { error?: { description?: string } })?.error?.description;
-      reject(new Error(description || "Payment failed. Please try again."));
+      // Not terminal — do not settle the promise. The modal stays open for
+      // a retry, which may still call `handler` with a success.
+      console.warn("Razorpay payment attempt failed (may retry):", response);
     });
 
     instance.open();
