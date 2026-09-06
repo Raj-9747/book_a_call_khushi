@@ -6,7 +6,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
-import { ExternalLink, Trash2, Upload } from "lucide-react";
+import { Trash2, Upload } from "lucide-react";
 import {
   Avatar,
   Button,
@@ -128,17 +128,8 @@ export function PublicProfileForm({ admin }: { admin: Admin }) {
       <CardHeader>
         <CardTitle>Public profile</CardTitle>
         <CardDescription>
-          What clients see at{" "}
-          <a
-            href={`/book/${admin.slug}`}
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex items-center gap-1 font-medium text-brand-600 hover:underline"
-          >
-            /book/{admin.slug}
-            <ExternalLink className="h-3 w-3" />
-          </a>
-          . Every field here is optional — anything you leave blank is simply hidden.
+          What clients see on your booking page. Every field here is optional — anything you leave blank is simply
+          hidden.
         </CardDescription>
       </CardHeader>
       <form onSubmit={handleSubmit(onSubmit)} noValidate>

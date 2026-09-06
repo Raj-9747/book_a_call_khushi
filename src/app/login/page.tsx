@@ -11,7 +11,7 @@ export default async function LoginPage() {
   }
 
   return (
-    <AuthShell title="Sign in to Zaptly" description="Manage your calls, leads and schedule">
+    <AuthShell title="Welcome back" description="Sign in to manage your bookings, availability and clients.">
       <Suspense>
         <LoginForm />
       </Suspense>

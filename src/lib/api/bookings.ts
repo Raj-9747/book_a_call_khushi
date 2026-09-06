@@ -68,7 +68,10 @@ export async function listBookings(adminId: string, params: ListBookingsParams):
   return { bookings: (data ?? []).map(normalizeBooking), totalCount: count ?? 0 };
 }
 
-export async function updateBookingLeadInfo(id: string, input: { notes?: string; tag?: LeadTag | null }): Promise<void> {
+export async function updateBookingLeadInfo(
+  id: string,
+  input: { notes?: string | null; tag?: LeadTag | null }
+): Promise<void> {
   const supabase = createClient();
   const { error } = await supabase.from("bookings").update(input).eq("id", id);
   if (error) throw error;

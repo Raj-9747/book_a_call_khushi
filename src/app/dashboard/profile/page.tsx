@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { ChangePasswordForm } from "@/components/account/ChangePasswordForm";
 import { ProfileForm } from "@/components/account/ProfileForm";
 import { PublicProfileForm } from "@/components/account/PublicProfileForm";
+import { PublicLinkCard } from "@/components/account/PublicLinkCard";
 import { BookingToggleCard } from "@/components/account/BookingToggleCard";
 import { GoogleCalendarConnect } from "@/components/dashboard/GoogleCalendarConnect";
 
@@ -16,6 +17,7 @@ export default async function DashboardProfilePage() {
     <>
       <PageHeader title="Profile" description="Your public page, account details and integrations" />
       <div className="max-w-2xl space-y-6 p-4 sm:p-8">
+        <PublicLinkCard admin={admin} />
         <PublicProfileForm admin={admin} />
         <BookingToggleCard admin={admin} />
         <ProfileForm admin={admin} />

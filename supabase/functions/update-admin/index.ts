@@ -14,6 +14,7 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 import { corsHeaders, jsonResponse } from "../_shared/cors.ts";
 import { ADMIN_COLUMNS } from "../_shared/adminColumns.ts";
 import { normalizeIndianPhone } from "../_shared/phone.ts";
+import { normalizeSlug } from "../_shared/slug.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -53,14 +54,14 @@ Deno.serve(async (req) => {
     return jsonResponse({ error: "Only an active super_admin can edit admins" }, 403);
   }
 
-  const { admin_id, name, email, phone, password } = await req.json();
+  const { admin_id, name, email, phone, password, slug } = await req.json();
   if (!admin_id) {
     return jsonResponse({ error: "admin_id is required" }, 400);
   }
   if (password && password.length < 8) {
     return jsonResponse({ error: "Password must be at least 8 characters" }, 400);
   }
-  if (!name && !email && !phone && !password) {
+  if (!name && !email && !phone && !password && !slug) {
     return jsonResponse({ error: "Nothing to update" }, 400);
   }
   let normalizedPhone: string | null = null;
@@ -75,12 +76,30 @@ Deno.serve(async (req) => {
 
   const { data: target } = await adminClient
     .from("admins")
-    .select("auth_user_id")
+    .select("auth_user_id, slug")
     .eq("id", admin_id)
     .maybeSingle();
 
   if (!target) {
     return jsonResponse({ error: "Admin not found" }, 404);
+  }
+
+  let normalizedSlug: string | null = null;
+  const isSlugChange = !!slug && slug !== target.slug;
+  if (isSlugChange) {
+    normalizedSlug = normalizeSlug(slug);
+    if (!normalizedSlug) {
+      return jsonResponse({ error: "Use 3-50 lowercase letters, numbers and hyphens only." }, 400);
+    }
+    const { data: existingSlug } = await adminClient
+      .from("admins")
+      .select("id")
+      .eq("slug", normalizedSlug)
+      .neq("id", admin_id)
+      .maybeSingle();
+    if (existingSlug) {
+      return jsonResponse({ error: "That link is already taken. Try another." }, 409);
+    }
   }
 
   if (email) {
@@ -114,6 +133,7 @@ Deno.serve(async (req) => {
   if (name) rowUpdate.name = name;
   if (email) rowUpdate.email = email;
   if (normalizedPhone) rowUpdate.phone = normalizedPhone;
+  if (isSlugChange && normalizedSlug) rowUpdate.slug = normalizedSlug;
 
   // Changing the login email forces a Google Calendar reconnect — the
   // admin's identity changed, so re-verifying via a fresh OAuth grant is
@@ -132,7 +152,13 @@ Deno.serve(async (req) => {
       .select(ADMIN_COLUMNS)
       .single();
     if (updateError) {
-      return jsonResponse({ error: updateError.message }, 400);
+      // 23505 = unique violation — the pre-check above is best-effort;
+      // this is the actual guard against two edits racing for one slug.
+      const isDuplicateSlug = updateError.code === "23505" && /slug/i.test(updateError.message);
+      return jsonResponse(
+        { error: isDuplicateSlug ? "That link is already taken. Try another." : updateError.message },
+        400
+      );
     }
     admin = data;
   }

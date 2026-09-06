@@ -6,6 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { LogOut, Menu, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Avatar } from "@/components/ui";
+import { ZaptlyLogo } from "@/components/brand/ZaptlyLogo";
 import { cn } from "@/lib/utils";
 import { NAV_ITEMS_BY_SECTION, type NavSection } from "./nav-config";
 
@@ -54,12 +55,7 @@ export function AppShell({
         >
           <Menu className="h-5 w-5" />
         </button>
-        <div className="flex items-center gap-2">
-          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-brand-600 text-sm font-bold text-white">
-            Z
-          </div>
-          <span className="text-base font-semibold text-neutral-900">Zaptly</span>
-        </div>
+        <ZaptlyLogo markClassName="h-7 w-7" />
       </div>
 
       {/* Mobile backdrop */}
@@ -78,12 +74,7 @@ export function AppShell({
         )}
       >
         <div className="flex h-16 items-center justify-between gap-2 border-b border-border px-6">
-          <div className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-600 text-sm font-bold text-white">
-              Z
-            </div>
-            <span className="text-base font-semibold text-neutral-900">Zaptly</span>
-          </div>
+          <ZaptlyLogo />
           <button
             onClick={() => setMobileOpen(false)}
             className="rounded-md p-1 text-neutral-400 hover:bg-neutral-100 md:hidden"

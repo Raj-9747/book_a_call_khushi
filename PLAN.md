@@ -398,12 +398,36 @@ New `.env.local` var: `NEXT_PUBLIC_RAZORPAY_KEY_ID` (public by design).
 
 ## 9.10 What you'll need to provide
 
-- [ ] Razorpay **test** Key ID + Key Secret
-- [ ] After I deploy `razorpay-webhook`, add its URL in the Razorpay dashboard (Settings → Webhooks) with events `payment.captured`, `payment.failed`, `refund.processed`, and paste the webhook secret you set there — I'll give exact steps
-- [ ] Run migrations `0009`–`0013` and create the `admin-photos` Storage bucket (I'll provide the SQL and the dashboard steps)
-- [ ] Import the new `expire-holds-cron.json` n8n workflow and activate it
-- [ ] Re-deploy the listed Edge Functions and update the Supabase DB webhook to fire on INSERT **or UPDATE**
+- [x] Razorpay **test** Key ID + Key Secret
+- [x] `razorpay-webhook` deployed, its URL added in the Razorpay dashboard (Settings → Webhooks) with events `payment.captured`, `payment.failed`, `refund.processed`, webhook secret set on both sides
+- [x] Migrations `0009`–`0013` run, `admin-photos` Storage bucket created
+- [x] `expire-holds-cron.json` imported and activated in n8n
+- [x] Edge Functions deployed; Supabase DB webhook on `bookings` changed to fire on INSERT **and** UPDATE
+- [x] Vercel Function Region set to `hnd1` (Tokyo), matching the Supabase project's region — a performance fix that came up during this phase, not originally planned, but worth recording here since it changed deploy config
 
 ## 9.11 Deferred to a later phase
 
 Testimonials/reviews, earnings & payout dashboard, buffer time, daily booking limits, embed widget, post-call follow-up email, digital products, multiple durations per event type, no-show tracking, analytics, custom branding, Zoom/Teams, GST invoices.
+
+## 9.12 Status — shipped
+
+All six items in §9.1 are built, deployed, and tested. A few implementation details ended up differing from the original spec above as the work progressed — recorded here so this document stays accurate rather than aspirational:
+
+- **Payment creation is one function, `create-booking`, not `create-razorpay-order`.** It does both jobs — pricing/validating the booking AND opening the Razorpay order — in a single call, since the two can't safely happen apart (the client must never be able to mint a booking without a matching order). `verify-razorpay-payment`, `razorpay-webhook`, `expire-pending-bookings`, and `refund-razorpay-payment` all shipped as planned.
+- **The hold-expiry sweep runs every 5 minutes, not 10** (`expire-holds-cron.json`). A hold set for exactly 10 minutes therefore actually lapses somewhere between 10–15 minutes depending on schedule timing — never earlier, since the sweep only touches holds whose window has already passed. The slot itself frees at exactly 10 minutes regardless; the sweep is just bookkeeping (status + discount-code refund).
+- **Reschedule approval doesn't need a new Edge Function or n8n workflow.** Approving reuses the *existing* confirmation pipeline: it clears the old Calendar event, updates the booking's time, and flips `confirmation_sent` back to false — which makes the same DB-webhook → `relay-booking-to-n8n` path fire again as if it were a brand new booking, creating a fresh Calendar event and re-sending a (now-correct) confirmation email. Approve/reject are otherwise plain RLS-guarded table writes from the browser; only the refund step needs the Razorpay secret.
+- **Requests get a nav badge with a live pending count**, fetched server-side in `dashboard/layout.tsx` — this was called out as a nice-to-have in the original plan and did ship.
+
+**Two extras shipped in this phase that weren't in the original six-item scope**, both raised during testing rather than planned upfront:
+
+- **Bookings page: sorting + server-side pagination.** Sort by event date or by booking-created date (asc/desc), 20 rows/page with Prev/Next. Rebuilt as a real server-side query (`.range()`/`.order()`/`.ilike()`) rather than paginating an already-fetched list, specifically so it stays a fixed-cost query as booking history grows instead of degrading back into "fetch everything."
+- **Every native `window.confirm()` replaced with a themed modal** (`ConfirmProvider`/`useConfirm()`), completing the standing "no native browser/OS UI" rule for the one control that had been missed — cancelling a booking, deleting an event type/discount code/enquiry, removing an admin, disconnecting Calendar.
+
+**Slug editing, previously declined, was added back in.** Earlier in the project the decision was to auto-generate an admin's slug from their name and leave it fixed — no UI to change it, since two same-named admins were expected to be rare and auto-numbering (`harshal`, `harshal-2`, ...) handled the collision case. That held until it came up as a real question: an admin wants a more meaningful link than the auto-numbered fallback. Slug editing now exists in two places — the admin's own Profile page and the super-admin's Edit Admin modal — both going through the existing `update-own-profile` / `update-admin` Edge Functions (uniqueness re-checked server-side, race-safe via the column's existing DB-level unique constraint) and both requiring an explicit confirm, since changing it immediately breaks any `/book/<old-slug>` link already shared.
+
+**Bugs found and fixed during this phase's testing**, worth keeping a record of since they weren't obvious from the plan:
+- Razorpay Checkout was treating the *first* `payment.failed` (e.g. a declined card) as terminal, silently dropping a successful retry with a different method in the same session
+- `Select` dropdown always opened downward with no viewport check, running off-screen near the bottom of a modal — now measures available space and flips upward when needed
+- The booking details modal's "Back to your details" wiped name/email/phone (it was reusing the same state for both "what the client typed" and "which step to show"); custom question answers were unaffected since those lived in separate state
+- `getCurrentAdmin()` was being called twice per navigation (once in a layout, once in the page under it) — wrapped in React's `cache()` to dedupe within a request
+- A stray `paid_dummy` → `paid` data migration ordering bug (constraint had to be dropped before the backfill, not after)

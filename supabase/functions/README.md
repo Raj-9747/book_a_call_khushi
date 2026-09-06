@@ -91,6 +91,12 @@ The four payment-related functions are deployed with `--no-verify-jwt` because t
 
 > **Re-deploy needed after migration `0009`:** `create-admin`, `update-admin` and `update-own-profile` now return the new profile columns via the shared `_shared/adminColumns.ts` list. Without a re-deploy, editing a profile from the dashboard will still work but the response will be missing the new fields.
 
+> **Re-deploy needed for slug editing:** `update-admin` and `update-own-profile` now also accept a `slug` field, validated by the new `_shared/slug.ts`. Re-deploy both:
+> ```bash
+> supabase functions deploy update-admin
+> supabase functions deploy update-own-profile
+> ```
+
 `relay-booking-to-n8n` is deployed with `--no-verify-jwt` because it's called by a Supabase Database Webhook, not by a logged-in user — it authorizes the caller with the `x-webhook-secret` header instead (see `n8n/README.md`). `get-google-busy-times` is also `--no-verify-jwt` since it's called by anonymous public booking-page visitors — it's a read-only, non-sensitive lookup (same trust model as the public RPCs), so no auth check is needed.
 
 No Auth email templates or redirect URL configuration are required for admin management — accounts are created directly with a password, not via invite email.

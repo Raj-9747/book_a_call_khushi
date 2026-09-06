@@ -323,6 +323,11 @@ export function BookingsManager({ adminId }: { adminId: string }) {
       </div>
 
       <LeadDetailModal
+        // Remount per booking. The modal seeds its notes/tag state from
+        // props with useState, which only runs on mount — without a
+        // changing key the component instance is reused across selections
+        // and one booking's unsaved notes bleed into the next one.
+        key={selected?.id ?? "none"}
         booking={selected}
         onClose={() => setSelected(null)}
         onUpdated={(updated) => {

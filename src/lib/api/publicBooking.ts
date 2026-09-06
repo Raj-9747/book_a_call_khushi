@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/client";
+import { edgeFunctionError } from "./edgeFunctionError";
 
 export interface PublicAdmin {
   id: string;
@@ -182,22 +183,6 @@ export interface PendingBookingResult {
 }
 
 export type CreateBookingResult = FreeBookingResult | PendingBookingResult;
-
-/** Unwraps an Edge Function error into the message the function actually
- * sent. `functions.invoke` reports a non-2xx as a generic
- * FunctionsHttpError, with the useful text only in the response body. */
-async function edgeFunctionError(error: unknown, fallback: string): Promise<Error> {
-  const context = (error as { context?: Response })?.context;
-  if (context && typeof context.json === "function") {
-    try {
-      const body = await context.json();
-      if (body?.error) return new Error(body.error);
-    } catch {
-      /* Body wasn't JSON — fall through to the generic message. */
-    }
-  }
-  return new Error(error instanceof Error && error.message ? error.message : fallback);
-}
 
 /** Creates the booking server-side.
  *

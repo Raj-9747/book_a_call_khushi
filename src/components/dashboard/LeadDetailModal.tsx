@@ -37,9 +37,13 @@ export function LeadDetailModal({
   async function handleSave() {
     setSaving(true);
     try {
-      await updateBookingLeadInfo(booking!.id, { notes: notes || undefined, tag: (tag || null) as LeadTag | null });
+      // `|| null`, not `|| undefined` — an omitted key leaves the old value
+      // in place, which made clearing a note impossible.
+      const nextNotes = notes.trim() || null;
+      const nextTag = (tag || null) as LeadTag | null;
+      await updateBookingLeadInfo(booking!.id, { notes: nextNotes, tag: nextTag });
       toast.success("Saved");
-      onUpdated({ ...booking!, notes, tag: (tag || null) as LeadTag | null });
+      onUpdated({ ...booking!, notes: nextNotes, tag: nextTag });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to save");
     } finally {

@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/client";
 import { ADMIN_COLUMNS } from "@/lib/api/adminColumns";
+import { edgeFunctionError } from "@/lib/api/edgeFunctionError";
 import type { Admin } from "@/types/models";
 
 export async function listAdmins(): Promise<Admin[]> {
@@ -22,7 +23,7 @@ export async function createAdmin(input: {
   const supabase = createClient();
   const { data, error } = await supabase.functions.invoke("create-admin", { body: input });
 
-  if (error) throw error;
+  if (error) throw await edgeFunctionError(error, "Failed to create admin.");
   if (data?.error) throw new Error(data.error);
   return data.admin as Admin;
 }
@@ -33,10 +34,11 @@ export async function updateAdmin(input: {
   email?: string;
   phone?: string;
   password?: string;
+  slug?: string;
 }): Promise<void> {
   const supabase = createClient();
   const { data, error } = await supabase.functions.invoke("update-admin", { body: input });
-  if (error) throw error;
+  if (error) throw await edgeFunctionError(error, "Failed to update admin.");
   if (data?.error) throw new Error(data.error);
 }
 
@@ -49,7 +51,7 @@ export async function setAdminActive(id: string, isActive: boolean): Promise<voi
 export async function removeAdmin(id: string): Promise<void> {
   const supabase = createClient();
   const { data, error } = await supabase.functions.invoke("remove-admin", { body: { admin_id: id } });
-  if (error) throw error;
+  if (error) throw await edgeFunctionError(error, "Failed to remove admin.");
   if (data?.error) throw new Error(data.error);
 }
 
@@ -138,13 +140,21 @@ export async function removeAdminPhoto(adminId: string, currentUrl: string | nul
   if (path) await supabase.storage.from(PHOTO_BUCKET).remove([path]);
 }
 
-/** An admin editing their OWN name/phone/email. Changing email forces a
- * Google Calendar reconnect (clears the stored token) — see
- * update-own-profile Edge Function for why. */
-export async function updateOwnProfile(input: { name?: string; email?: string; phone?: string }): Promise<Admin> {
+/** An admin editing their OWN name/phone/email/slug. Changing email forces
+ * a Google Calendar reconnect (clears the stored token); changing the slug
+ * immediately breaks any `/book/<old-slug>` link already shared — the
+ * caller is expected to have warned about that before calling this. See
+ * the update-own-profile Edge Function for why both go through it rather
+ * than a plain table write. */
+export async function updateOwnProfile(input: {
+  name?: string;
+  email?: string;
+  phone?: string;
+  slug?: string;
+}): Promise<Admin> {
   const supabase = createClient();
   const { data, error } = await supabase.functions.invoke("update-own-profile", { body: input });
-  if (error) throw error;
+  if (error) throw await edgeFunctionError(error, "Failed to update profile.");
   if (data?.error) throw new Error(data.error);
   return data.admin as Admin;
 }

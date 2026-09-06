@@ -201,6 +201,17 @@ No migration needed — this is a frontend-only change (the list query is now se
 
 ---
 
+## Booking link (slug) editing
+
+No migration — needs `update-admin` and `update-own-profile` re-deployed (see [`supabase/functions/README.md`](supabase/functions/README.md)).
+
+61. Dashboard → Profile → the new **Your booking link** card → Edit → change it → Save → confirm a warning appears first ("the old link will stop working"), then confirm it → the link updates and the old `/book/<old-slug>` now 404s.
+62. Try a slug that's too short, has spaces/symbols, or is already taken by another admin (e.g. try the super-admin's own slug) → confirm each gets a clear error, not a raw database message.
+63. Super-admin → Admins → Edit an admin → change their **Booking link** field the same way → same confirm warning → confirm the change reflects immediately in their public page and in the Admins table.
+64. Confirm any friendly Edge Function error (a taken slug, a duplicate email) now shows its actual message in the toast — not the generic "Edge Function returned a non-2xx status code" text (this was a pre-existing bug in `updateAdmin`/`updateOwnProfile`, fixed alongside slug editing since it would have swallowed the new "link already taken" message too).
+
+---
+
 ## Still to come (not needed yet, listed so nothing is a surprise later)
 
 - Zaple account/API key — WhatsApp confirmation/reminders (email via Gmail is built; WhatsApp isn't yet)
