@@ -409,6 +409,8 @@ New `.env.local` var: `NEXT_PUBLIC_RAZORPAY_KEY_ID` (public by design).
 
 Testimonials/reviews, earnings & payout dashboard, buffer time, daily booking limits, embed widget, post-call follow-up email, digital products, multiple durations per event type, no-show tracking, analytics, custom branding, Zoom/Teams, GST invoices.
 
+Partly superseded by Phase 11 (§10): the **earnings dashboard** and basic **analytics** shipped as the Payments page and the rebuilt Overview. Payouts themselves are still out of scope — Razorpay settles to the bank account directly, so there's nothing for this app to compute.
+
 ## 9.12 Status — shipped
 
 All six items in §9.1 are built, deployed, and tested. A few implementation details ended up differing from the original spec above as the work progressed — recorded here so this document stays accurate rather than aspirational:
@@ -456,3 +458,82 @@ None of these four needed a UI change or lost any working feature — confirmed 
 **Two items flagged, not changed — worth a conscious decision, not a silent fix:**
 - Any admin can still `insert`/`update` their own `bookings` rows directly (status, `amount_paid`, `payment_status`, etc.) — `bookings_all_own` has no column restriction. Doesn't cross admin boundaries, but it does mean the careful server-side pricing/conflict logic in `create_booking_priced` can be bypassed for an admin's own data (e.g. manually marking a booking "paid"). Worth deciding whether that's an accepted trade-off (useful for manual entry) or something to lock down.
 - `approveReschedule`'s conflict check (`src/lib/api/changeRequests.ts`) only queries `bookings`/`blocked_slots` for `confirmed`/`pending_confirmation` status — it does not check live `pending_payment` holds or the admin's real Google Calendar, and doesn't re-check min-notice/booking-window despite the function's own comment implying it does. An admin could approve a reschedule onto a slot someone is mid-payment for. Narrow window, real gap — worth a follow-up fix.
+
+---
+
+## 10. Phase 11 — Product surface, theming and money visibility
+
+Everything below shipped after the Phase 10 audit (§9.12). Unlike Phase 10 this wasn't planned up front as a block — it came out of testing the built product and reacting to what was missing or wrong, so this section is a record of what exists rather than a spec written ahead of it.
+
+## 10.1 Scope
+
+| Area | What shipped |
+|---|---|
+| Marketing site | Full landing page at `/`, which previously just redirected to `/login`. Nav, hero with a live product mock, features, how-it-works, payments, automation, teams, FAQ, CTA, footer. Deliberately no fabricated logos, testimonials or usage stats — the page is shown to real prospects, so its credibility comes from product mocks and specific capability copy. |
+| Branding | Real logo mark (lightning bolt in a gradient tile) replacing the plain "Z" box, used in nav, sidebar, footer, sign-in and as `icon.svg`. The stock Next.js `favicon.ico` was still in place and has been removed. |
+| Sign-in | Split-screen layout: form left, fixed-dark brand panel right. Explains that accounts are provisioned by a super-admin, turning the absent sign-up into a stated access model rather than a gap. |
+| Dark mode | Token-based, **scoped to `/dashboard` and `/admin` only** — see §10.3. |
+| App shell | Sidebar now collapsible on desktop, visually distinct from the content area, and no longer scrolls away with the page. |
+| Public profile | `/book/[adminSlug]` rebuilt as a Topmate-style split: sticky identity panel (~38%) beside a session grid. |
+| Payments | New `/dashboard/payments` — full transaction list, totals, refund status, CSV export. |
+| Overview | Rebuilt from three counters into earnings, today's schedule, action items and top sessions. |
+| Blocked time | Repeating blocks (weekly / fortnightly / monthly) and a DB-level overlap guard. |
+
+## 10.2 Migrations added
+
+- `0015_admin_social_links.sql` — `x_url` + `website_url` on admins; re-creates `get_public_admin` and `get_booking_by_token` to return them. **Note:** shipping the frontend before this migration ran caused a login loop — `ADMIN_COLUMNS` asked for columns that didn't exist, `getCurrentAdmin()` returned null, and every gated layout read that as "not signed in". `getCurrentAdmin()` now logs the query error instead of swallowing it, so the next schema drift is diagnosable in seconds.
+- `0016_recurring_blocked_slots.sql` — `recurrence_group_id`, plus a `btree_gist` **exclusion constraint** preventing overlapping blocks per admin.
+- `0017_dashboard_overview.sql` — `get_dashboard_overview()`.
+- `0018_payment_summary.sql` — `get_payment_summary(from, to)`.
+
+`0015`–`0018` must all be run before deploying the matching frontend — `0015` in particular, for the reason above.
+
+Both new RPCs deliberately take **no `admin_id` argument**. They're `SECURITY DEFINER` (so they can aggregate across rows, which means RLS does not apply inside them) — an `admin_id` parameter would therefore be a free read of any other admin's revenue. They derive the admin from `current_admin_id()` instead, leaving nothing to tamper with.
+
+## 10.3 Dark mode — how it's built, and why
+
+Implemented by **re-pointing the design tokens** under a `.dark` class rather than adding `dark:` variants across ~70 components. Anything already built on `bg-surface` / `text-neutral-900` / `border-border` adapts with no per-component work.
+
+Consequences worth knowing:
+
+- **The neutral scale inverts.** `text-neutral-900` is the primary text colour, so in dark mode it must resolve light — which means `bg-neutral-900` resolves light too. Any surface that must stay dark in *both* themes (modal backdrops, the landing CTA panel, the sign-in brand panel, the public profile's indigo panel) uses raw `slate-*`/`indigo-*`, which sit outside the token system.
+- **Semantic accents are tokenised.** ~24 raw `emerald`/`red`/`amber` utilities became `success`/`warning`/`danger` tokens; left alone they'd have produced dark-green text on a dark-green badge.
+- **The class lives on `<html>`, not a wrapper.** Portal-rendered modals, dropdowns and date pickers mount to `document.body` and would escape any scoped container, leaving a light page with dark popups.
+- **But it's applied only on `/dashboard` and `/admin`** (`isThemedRoute` in `src/lib/theme.ts`). Dark mode is an admin-workspace preference; the public booking pages, magic link and marketing site always render light. Enforced in two places — the provider re-evaluates on route change, and the pre-paint boot script does the same path check so an admin previewing their own booking page gets no dark flash.
+- The boot script reads its storage key from a **plain module**, not the `"use client"` provider. A constant imported from a client module into a server component arrives as a client *reference proxy*, not the string — which emitted a broken script until caught.
+
+## 10.4 Repeating blocked time — design note
+
+A repeating block is **materialised as one row per occurrence** sharing a `recurrence_group_id`, not stored as a rule expanded at read time.
+
+Conflict checking currently lives in four independent places — `get_busy_ranges`, `create_booking_priced`, the reschedule-approval query, and the Google Calendar sync. Concrete rows mean all four keep working untouched. A stored rule would mean teaching every one of them to expand recurrences, and missing any single one would silently let a client book over blocked time. Capped at 60 occurrences, since each is a real row that also syncs to Google Calendar.
+
+## 10.5 Client-facing fixes
+
+- Reschedule/cancel **reason is now mandatory** — the admin is being asked to approve a change and decide a refund; "no reason given" just forces another round-trip.
+- **Country-code selector** (36 codes, India default) with per-country digit rules, and stricter email validation than zod's `.email()` allows. Phone stored as E.164.
+- Dropdown questions always offer **"Other"** with a free-text box; the typed value is what's stored, so the admin sees the real answer rather than a literal "Other".
+- Booking-details modal **cannot be dismissed by an outside click** — a client losing their typed details mid-booking is the highest-cost version of that mistake.
+
+## 10.6 Admin-facing fixes
+
+- Form modals refuse backdrop/Escape dismissal **once the form is dirty** (untouched modals still close freely); X and Cancel always work.
+- Dropdowns are **searchable** past 8 options and open downward by default — the earlier "flip up when short on space" fix was making them open in the wrong direction inside modals.
+- Native number-input spinners removed globally.
+- Pagination on Bookings (server-side), and Discounts, Enquiries, Requests, Admins, Event Types (client-side, via `usePagination`). The split is deliberate: bookings grow without bound, the others are small-N.
+- Discounts gained search + status + event-type filters. An "applies to all sessions" code correctly matches any event-type filter.
+- Password show/hide toggle; `Edit` promoted out of the ⋯ menu on Discounts.
+- Booking link card now shows the full URL with Copy / View / Edit.
+- `LeadDetailModal` notes no longer bleed between bookings (the modal never unmounts, so its `useState` initialiser only ran once — fixed with a `key`); clearing a note now actually clears it.
+
+## 10.7 Performance
+
+Fixed: Vercel function region colocated with Supabase (Tokyo) — compute was in Virginia, crossing the Pacific per query; `getCurrentAdmin()` deduped with React `cache()` (layout and page both called it); `loading.tsx` added to all dashboard routes (Next.js holds the *old* page on screen until the new one renders, so navigation read as "nothing happened"); the overview's four client-side queries moved server-side into one RPC.
+
+**Still outstanding:** Bookings, Event Types, Discounts, Requests, Enquiries and the Admins list still fetch client-side after mount, so those keep a shell → spinner → data pattern. Middleware and the layout each still call `auth.getUser()` — one could be removed by passing the validated id downstream in a request header, but it's fiddly around Supabase's cookie refresh and worth less now the regions are colocated.
+
+## 10.8 Still open
+
+- The two items flagged in §9.12 remain unaddressed: admins can write arbitrary values to their own `bookings` rows, and `approveReschedule` doesn't check live `pending_payment` holds or Google Calendar before approving.
+- WhatsApp/Zaple notifications are still not built — email only.
+- Payment-page view tracking / conversion rate ("120 viewed, 8 booked") would need new view logging on `/book/*`; deliberately not added.
