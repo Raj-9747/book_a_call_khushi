@@ -20,6 +20,10 @@ export interface Admin {
   about: string | null;
   linkedin_url: string | null;
   instagram_url: string | null;
+  /** Column is `x_url`, not `twitter_url` — the platform renamed in 2023.
+   * The admin-facing label still says "X (Twitter)" for recognisability. */
+  x_url: string | null;
+  website_url: string | null;
 
   // Booking configuration
   accepting_bookings: boolean;

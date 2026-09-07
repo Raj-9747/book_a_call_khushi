@@ -7,7 +7,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
 import { loginSchema, type LoginInput } from "@/lib/validations/auth";
-import { Button, FormField, Input } from "@/components/ui";
+import { Button, FormField, Input, PasswordInput } from "@/components/ui";
 
 export function LoginForm() {
   const router = useRouter();
@@ -73,7 +73,7 @@ export function LoginForm() {
         <Input id="email" type="email" autoComplete="email" placeholder="you@company.com" {...register("email")} />
       </FormField>
       <FormField label="Password" htmlFor="password" error={errors.password?.message} required>
-        <Input id="password" type="password" autoComplete="current-password" placeholder="••••••••" {...register("password")} />
+        <PasswordInput id="password" autoComplete="current-password" placeholder="••••••••" {...register("password")} />
       </FormField>
       <Button type="submit" className="w-full" isLoading={submitting}>
         Sign in

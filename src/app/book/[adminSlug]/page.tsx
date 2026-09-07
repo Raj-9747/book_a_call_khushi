@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { AdminProfileHeader } from "@/components/booking/AdminProfileHeader";
+import { ProfileSidePanel } from "@/components/booking/ProfileSidePanel";
 import { EventTypeList } from "@/components/booking/EventTypeList";
 import { EnquiryForm } from "@/components/booking/EnquiryForm";
 import type { PublicAdmin, PublicAdminEventType } from "@/lib/api/publicBooking";
@@ -42,16 +42,21 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
   }));
 
   return (
-    <div className="min-h-screen bg-surface-muted px-4 py-10 sm:py-16">
-      <div className="mx-auto w-full max-w-xl">
-        <div className="rounded-2xl border border-border bg-surface px-5 py-8 shadow-xs sm:px-8 sm:py-10">
-          <AdminProfileHeader admin={admin} />
-        </div>
+    // Two-pane on desktop: a fixed identity panel that stays put while the
+    // session list scrolls beside it. Stacks on mobile, panel first.
+    <div className="min-h-screen bg-surface-muted lg:flex lg:items-start">
+      <ProfileSidePanel admin={admin} />
 
-        <div className="mt-6">
+      <main className="flex-1 px-5 py-8 sm:px-8 lg:px-12 lg:py-14">
+        <div className="mx-auto max-w-3xl">
           {admin.accepting_bookings ? (
             <>
-              <h2 className="mb-3 px-1 text-sm font-semibold text-neutral-900">Book a session</h2>
+              <div className="mb-6">
+                <h2 className="text-xl font-semibold tracking-tight text-neutral-900">Book a session</h2>
+                <p className="mt-1 text-sm text-neutral-500">
+                  Pick what you need and choose a time that works for you.
+                </p>
+              </div>
               <EventTypeList adminSlug={admin.slug} eventTypes={eventTypes} />
             </>
           ) : (
@@ -61,8 +66,12 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
               unavailableMessage={admin.unavailable_message}
             />
           )}
+
+          <p className="mt-10 flex items-center justify-center gap-1.5 text-xs text-neutral-400 lg:hidden">
+            Powered by Zaptly
+          </p>
         </div>
-      </div>
+      </main>
     </div>
   );
 }

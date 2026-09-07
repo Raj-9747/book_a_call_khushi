@@ -45,6 +45,8 @@ const schema = z.object({
     .transform((value) => (value === "" ? null : value)),
   linkedin_url: optionalUrl,
   instagram_url: optionalUrl,
+  x_url: optionalUrl,
+  website_url: optionalUrl,
 });
 type FormInput = z.input<typeof schema>;
 type FormValues = z.output<typeof schema>;
@@ -68,6 +70,8 @@ export function PublicProfileForm({ admin }: { admin: Admin }) {
       about: admin.about ?? "",
       linkedin_url: admin.linkedin_url ?? "",
       instagram_url: admin.instagram_url ?? "",
+      x_url: admin.x_url ?? "",
+      website_url: admin.website_url ?? "",
     },
   });
 
@@ -114,6 +118,8 @@ export function PublicProfileForm({ admin }: { admin: Admin }) {
         about: values.about ?? "",
         linkedin_url: values.linkedin_url ?? "",
         instagram_url: values.instagram_url ?? "",
+        x_url: values.x_url ?? "",
+        website_url: values.website_url ?? "",
       });
       router.refresh();
     } catch (err) {
@@ -187,6 +193,16 @@ export function PublicProfileForm({ admin }: { admin: Admin }) {
 
           <FormField label="Instagram" htmlFor="profile-instagram" error={errors.instagram_url?.message}>
             <Input id="profile-instagram" placeholder="https://instagram.com/…" {...register("instagram_url")} />
+          </FormField>
+
+          {/* Labelled "X (Twitter)" rather than just "X" — plenty of people
+              still recognise it by the old name. */}
+          <FormField label="X (Twitter)" htmlFor="profile-x" error={errors.x_url?.message}>
+            <Input id="profile-x" placeholder="https://x.com/…" {...register("x_url")} />
+          </FormField>
+
+          <FormField label="Website" htmlFor="profile-website" error={errors.website_url?.message}>
+            <Input id="profile-website" placeholder="https://yoursite.com" {...register("website_url")} />
           </FormField>
         </CardContent>
         <CardFooter>

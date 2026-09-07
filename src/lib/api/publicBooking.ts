@@ -13,6 +13,8 @@ export interface PublicAdmin {
   about: string | null;
   linkedin_url: string | null;
   instagram_url: string | null;
+  x_url: string | null;
+  website_url: string | null;
   accepting_bookings: boolean;
   unavailable_message: string | null;
   min_notice_minutes: number;

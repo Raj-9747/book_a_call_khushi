@@ -6,7 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
-import { Button, Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription, FormField, Input } from "@/components/ui";
+import { Button, Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription, FormField, PasswordInput } from "@/components/ui";
 
 const schema = z
   .object({
@@ -51,7 +51,7 @@ export function ChangePasswordForm() {
       <form onSubmit={handleSubmit(onSubmit)} noValidate>
         <CardContent className="space-y-4">
           <FormField label="New password" htmlFor="new-password" error={errors.password?.message} required>
-            <Input id="new-password" type="password" autoComplete="new-password" {...register("password")} />
+            <PasswordInput id="new-password" autoComplete="new-password" {...register("password")} />
           </FormField>
           <FormField
             label="Confirm new password"
@@ -59,7 +59,7 @@ export function ChangePasswordForm() {
             error={errors.confirmPassword?.message}
             required
           >
-            <Input id="confirm-password" type="password" autoComplete="new-password" {...register("confirmPassword")} />
+            <PasswordInput id="confirm-password" autoComplete="new-password" {...register("confirmPassword")} />
           </FormField>
         </CardContent>
         <CardFooter>

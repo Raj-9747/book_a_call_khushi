@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { formatInTimeZone } from "date-fns-tz";
 import { CalendarClock, XCircle } from "lucide-react";
 import { toast } from "sonner";
-import { Badge, Button, Modal, Spinner, Textarea } from "@/components/ui";
+import { Badge, Button, FormField, Modal, Spinner, Textarea } from "@/components/ui";
 import { computeAvailableSlots } from "@/lib/availability/computeSlots";
 import { getBusyRanges, getGoogleBusyRanges } from "@/lib/api/publicBooking";
 import { createChangeRequest, type ManagedBooking } from "@/lib/api/manageBooking";
@@ -23,6 +23,7 @@ export function ManageBookingActions({ booking, token }: { booking: ManagedBooki
   const router = useRouter();
   const [open, setOpen] = useState<ActionType | null>(null);
   const [message, setMessage] = useState("");
+  const [messageError, setMessageError] = useState<string | null>(null);
   const [preferredSlot, setPreferredSlot] = useState<Date | null>(null);
   const [slots, setSlots] = useState<Date[] | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -76,16 +77,30 @@ export function ManageBookingActions({ booking, token }: { booking: ManagedBooki
     if (submitting) return;
     setOpen(null);
     setMessage("");
+    setMessageError(null);
     setPreferredSlot(null);
   }
 
   async function handleSubmit(type: ActionType) {
+    // Required, not optional: the admin is being asked to approve a change
+    // and decide on a refund — "no reason given" leaves them nothing to
+    // decide on, and means another round-trip to ask.
+    const trimmedMessage = message.trim();
+    if (!trimmedMessage) {
+      setMessageError(
+        type === "reschedule"
+          ? "Please tell them why you need to reschedule."
+          : "Please tell them why you need to cancel."
+      );
+      return;
+    }
+
     setSubmitting(true);
     try {
       await createChangeRequest({
         token,
         type,
-        message: message.trim() || null,
+        message: trimmedMessage,
         preferredStart: type === "reschedule" ? preferredSlot : null,
       });
       toast.success("Your request has been sent to " + booking.admin_name);
@@ -110,7 +125,10 @@ export function ManageBookingActions({ booking, token }: { booking: ManagedBooki
           : `Your ${booking.request_type} request was not approved. Reply to your confirmation email if you still need help.`;
     return (
       <div className="flex items-start gap-2.5 rounded-lg border border-border bg-neutral-50 px-4 py-3 text-sm text-neutral-600">
-        <Badge tone={booking.request_status === "approved" ? "success" : booking.request_status === "rejected" ? "danger" : "brand"}>
+        <Badge
+          tone={booking.request_status === "approved" ? "success" : booking.request_status === "rejected" ? "danger" : "brand"}
+          className="shrink-0 capitalize"
+        >
           {booking.request_status}
         </Badge>
         <span>{label}</span>
@@ -156,13 +174,19 @@ export function ManageBookingActions({ booking, token }: { booking: ManagedBooki
               />
             )}
           </div>
-          <Textarea
-            rows={3}
-            maxLength={MAX_MESSAGE}
-            value={message}
-            onChange={(e) => setMessage(e.target.value)}
-            placeholder="Anything you'd like to add? (optional)"
-          />
+          <FormField label="Why do you need to reschedule?" error={messageError ?? undefined} required>
+            <Textarea
+              rows={3}
+              maxLength={MAX_MESSAGE}
+              value={message}
+              error={!!messageError}
+              onChange={(e) => {
+                setMessage(e.target.value);
+                setMessageError(null);
+              }}
+              placeholder="Let them know what's changed"
+            />
+          </FormField>
           <p className="text-xs text-neutral-400">
             Sent as a request to {booking.admin_name} — they&apos;ll confirm the new time with you.
           </p>
@@ -179,13 +203,19 @@ export function ManageBookingActions({ booking, token }: { booking: ManagedBooki
         description="This only sends a request — your booking stays as-is until it's approved."
       >
         <div className="space-y-4">
-          <Textarea
-            rows={3}
-            maxLength={MAX_MESSAGE}
-            value={message}
-            onChange={(e) => setMessage(e.target.value)}
-            placeholder="Let them know why, if you'd like (optional)"
-          />
+          <FormField label="Why do you need to cancel?" error={messageError ?? undefined} required>
+            <Textarea
+              rows={3}
+              maxLength={MAX_MESSAGE}
+              value={message}
+              error={!!messageError}
+              onChange={(e) => {
+                setMessage(e.target.value);
+                setMessageError(null);
+              }}
+              placeholder="Let them know why"
+            />
+          </FormField>
           <p className="text-xs text-neutral-500">
             {booking.amount_paid && booking.amount_paid > 0
               ? `A refund, if any, is decided by ${booking.admin_name} and isn't guaranteed.`

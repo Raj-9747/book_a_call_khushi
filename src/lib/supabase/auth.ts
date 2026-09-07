@@ -22,11 +22,21 @@ export const getCurrentAdmin = cache(async (): Promise<Admin | null> => {
 
   if (!user) return null;
 
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("admins")
     .select(`${ADMIN_COLUMNS}, weekly_availability`)
     .eq("auth_user_id", user.id)
     .maybeSingle();
+
+  // Surfaced, not swallowed. This query failing returns null, which every
+  // gated layout reads as "not signed in" and bounces to /login — so a
+  // schema drift (e.g. ADMIN_COLUMNS naming a column a migration hasn't
+  // added yet) shows up as an unexplained login loop rather than an error.
+  // Logging it makes that five seconds to diagnose instead of an hour.
+  if (error) {
+    console.error("getCurrentAdmin: failed to load the admin row —", error.message);
+    return null;
+  }
 
   return data as Admin | null;
 });

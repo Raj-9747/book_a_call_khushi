@@ -1,11 +1,7 @@
-"use client";
-
-import { useEffect, useState } from "react";
 import { formatInTimeZone } from "date-fns-tz";
 import { CalendarClock, CalendarDays, ListChecks } from "lucide-react";
-import { toast } from "sonner";
-import { Card, CardContent, Spinner } from "@/components/ui";
-import { getDashboardStats, type DashboardStats as Stats } from "@/lib/api/dashboardStats";
+import { Card, CardContent } from "@/components/ui";
+import type { DashboardStats as Stats } from "@/lib/api/dashboardStats";
 
 const IST = "Asia/Kolkata";
 
@@ -15,23 +11,10 @@ const STAT_CARDS = [
   { key: "totalBookings" as const, label: "Total bookings", icon: ListChecks },
 ];
 
-export function DashboardStats({ adminId }: { adminId: string }) {
-  const [stats, setStats] = useState<Stats | null>(null);
-
-  useEffect(() => {
-    getDashboardStats(adminId)
-      .then(setStats)
-      .catch((err) => toast.error(err instanceof Error ? err.message : "Failed to load stats"));
-  }, [adminId]);
-
-  if (stats === null) {
-    return (
-      <div className="flex justify-center py-8">
-        <Spinner className="h-6 w-6 text-neutral-400" />
-      </div>
-    );
-  }
-
+/** Purely presentational now — the page fetches the stats server-side and
+ * passes them in, so there's no client round trip and no spinner on the
+ * first screen after login. */
+export function DashboardStats({ stats }: { stats: Stats }) {
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">

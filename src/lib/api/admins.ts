@@ -80,6 +80,8 @@ export interface ProfileFields {
   about?: string | null;
   linkedin_url?: string | null;
   instagram_url?: string | null;
+  x_url?: string | null;
+  website_url?: string | null;
   accepting_bookings?: boolean;
   unavailable_message?: string | null;
   photo_url?: string | null;

@@ -15,7 +15,7 @@ import {
   type PublicEventType,
 } from "@/lib/api/publicBooking";
 import { openRazorpayCheckout } from "@/lib/payments/razorpay";
-import type { BookingDetailsValues } from "@/lib/validations/publicBooking";
+import { toE164, type BookingDetailsValues } from "@/lib/validations/publicBooking";
 import { AdminProfileHeader } from "./AdminProfileHeader";
 import { DateSlotPicker } from "./DateSlotPicker";
 import { BookingDetailsForm } from "./BookingDetailsForm";
@@ -98,7 +98,7 @@ export function BookingFlow({ admin, eventType }: { admin: PublicAdmin; eventTyp
         eventSlug: eventType.slug,
         clientName: finalDetails.name,
         clientEmail: finalDetails.email,
-        clientPhone: finalDetails.phone,
+        clientPhone: toE164(finalDetails.countryCode, finalDetails.phone),
         customAnswers,
         startTime: selectedSlot,
         clientTimezone: visitorTimeZone,
@@ -120,7 +120,7 @@ export function BookingFlow({ admin, eventType }: { admin: PublicAdmin; eventTyp
         currency: result.currency,
         name: admin.name,
         description: eventType.name,
-        prefill: { name: finalDetails.name, email: finalDetails.email, contact: finalDetails.phone },
+        prefill: { name: finalDetails.name, email: finalDetails.email, contact: toE164(finalDetails.countryCode, finalDetails.phone) },
       });
 
       const verified = await verifyPayment({

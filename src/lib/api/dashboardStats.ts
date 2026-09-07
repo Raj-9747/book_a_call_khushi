@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/client";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 export interface DashboardStats {
   upcomingCount: number;
@@ -7,8 +7,13 @@ export interface DashboardStats {
   nextBooking: { clientName: string; eventName: string; startTime: string } | null;
 }
 
-export async function getDashboardStats(adminId: string): Promise<DashboardStats> {
-  const supabase = createClient();
+/** Takes the Supabase client rather than creating one, so the dashboard
+ * page can run this server-side during its own render. Previously it built
+ * a browser client and ran after hydration, which meant the post-login
+ * landing page always showed a spinner while four queries went from the
+ * visitor's device to Supabase — from the server they're colocated with the
+ * database and land before the page is even sent. */
+export async function getDashboardStats(supabase: SupabaseClient, adminId: string): Promise<DashboardStats> {
   const now = new Date();
   const todayStart = new Date(now);
   todayStart.setHours(0, 0, 0, 0);

@@ -69,7 +69,9 @@ export default async function ManageBookingPage({ params }: { params: Promise<{ 
                 )}
               </div>
             </div>
-            <Badge tone={statusTone(booking.status)}>{booking.status.replace("_", " ")}</Badge>
+            <Badge tone={statusTone(booking.status)} className="capitalize">
+              {booking.status.replace("_", " ")}
+            </Badge>
           </div>
 
           <div className="space-y-5 px-5 py-6 sm:px-6">

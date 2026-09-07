@@ -20,6 +20,8 @@ export const ADMIN_COLUMNS = [
   "about",
   "linkedin_url",
   "instagram_url",
+  "x_url",
+  "website_url",
   "accepting_bookings",
   "unavailable_message",
   "min_notice_minutes",

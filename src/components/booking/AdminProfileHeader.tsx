@@ -1,6 +1,7 @@
+import { Globe } from "lucide-react";
 import { Avatar } from "@/components/ui";
 import type { PublicAdmin } from "@/lib/api/publicBooking";
-import { InstagramIcon, LinkedInIcon } from "./social-icons";
+import { InstagramIcon, LinkedInIcon, XIcon } from "./social-icons";
 
 /** The identity block at the top of an admin's public pages. Each optional
  * field is skipped entirely when unset, so a bare profile (name only) still
@@ -8,7 +9,9 @@ import { InstagramIcon, LinkedInIcon } from "./social-icons";
 export function AdminProfileHeader({ admin, compact }: { admin: PublicAdmin; compact?: boolean }) {
   const socials = [
     { href: admin.linkedin_url, icon: LinkedInIcon, label: "LinkedIn" },
+    { href: admin.x_url, icon: XIcon, label: "X" },
     { href: admin.instagram_url, icon: InstagramIcon, label: "Instagram" },
+    { href: admin.website_url, icon: Globe, label: "Website" },
   ].filter((s): s is { href: string; icon: typeof LinkedInIcon; label: string } => !!s.href);
 
   if (compact) {

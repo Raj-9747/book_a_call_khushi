@@ -231,3 +231,20 @@ body {
 * {
   border-color: var(--border);
 }
+
+/* Strip the native number-input spinners. They're browser-drawn chrome we
+   can't style (same rule as native selects/date pickers — see
+   DEVELOPMENT.md §2), they sit awkwardly inside our own input borders, and
+   nothing in this app benefits from click-to-increment on a price or a
+   percentage. Typing is the only interaction that matters here. */
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  appearance: none;
+  margin: 0;
+}
+
+input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
