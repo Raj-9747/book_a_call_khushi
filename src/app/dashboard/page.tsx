@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { CalendarClock, CalendarCheck, Clock, ListChecks } from "lucide-react";
 import { getCurrentAdmin } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
-import { getDashboardStats } from "@/lib/api/dashboardStats";
+import { getDashboardOverview } from "@/lib/api/dashboardStats";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Card, CardContent } from "@/components/ui";
 import { GoogleCalendarConnect } from "@/components/dashboard/GoogleCalendarConnect";
@@ -20,7 +20,7 @@ export default async function DashboardOverviewPage() {
   if (!admin) redirect("/login");
 
   const supabase = await createClient();
-  const stats = await getDashboardStats(supabase, admin.id);
+  const overview = await getDashboardOverview(supabase);
 
   return (
     <>
@@ -43,7 +43,7 @@ export default async function DashboardOverviewPage() {
           </Card>
         )}
 
-        <DashboardStats stats={stats} />
+        <DashboardStats overview={overview} />
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           {QUICK_LINKS.map((link) => {
