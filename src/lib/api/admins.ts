@@ -35,6 +35,7 @@ export async function updateAdmin(input: {
   phone?: string;
   password?: string;
   slug?: string;
+  is_active?: boolean;
 }): Promise<void> {
   const supabase = createClient();
   const { data, error } = await supabase.functions.invoke("update-admin", { body: input });
@@ -42,10 +43,22 @@ export async function updateAdmin(input: {
   if (data?.error) throw new Error(data.error);
 }
 
+/** Goes through the `update-admin` Edge Function rather than a direct table
+ * write — `role`/`is_active`/`auth_user_id` are revoked from the
+ * `authenticated` Postgres role entirely (migration 0014), after an audit
+ * found a logged-in admin could otherwise self-promote to super_admin via
+ * a bare `.update({ role: 'super_admin' })` call on their own row (the
+ * admins table's self-update RLS policy had no WITH CHECK on values). This
+ * is the one legitimate is_active write, so it's routed through the
+ * service-role function instead, gated on the caller being an active
+ * super_admin. */
 export async function setAdminActive(id: string, isActive: boolean): Promise<void> {
   const supabase = createClient();
-  const { error } = await supabase.from("admins").update({ is_active: isActive }).eq("id", id);
-  if (error) throw error;
+  const { data, error } = await supabase.functions.invoke("update-admin", {
+    body: { admin_id: id, is_active: isActive },
+  });
+  if (error) throw await edgeFunctionError(error, "Failed to update admin.");
+  if (data?.error) throw new Error(data.error);
 }
 
 export async function removeAdmin(id: string): Promise<void> {

@@ -19,6 +19,7 @@ Things needed from your side to get the current build running and testable. Grow
   - `0011_discount_codes.sql` — discount codes + which event types each one covers, price columns on `bookings`, the advisory `validate_discount_code` RPC, and a `create_public_booking` that prices the booking and redeems the code server-side
   - `0012_payments_and_magic_link.sql` — Razorpay columns + the `manage_token` magic link, the `pending_payment`/`expired` statuses and the new `payment_status` vocabulary (existing `paid_dummy` rows are folded into `paid`), and the RPCs behind booking creation, payment confirmation and hold expiry. **`create_public_booking` is revoked from anonymous callers here** — the public page now goes through the `create-booking` Edge Function instead
   - `0013_booking_change_requests.sql` — the `booking_change_requests` table (reschedule/cancel requests from the magic-link page), its public submission RPC, and a `get_booking_by_token` that also returns the admin's availability data (so the magic link can offer a real slot picker when proposing a reschedule) and any existing request on that booking
+  - `0014_security_hardening.sql` — closes two real gaps found in a full security audit: an admin could self-promote to `super_admin` via a direct table write (no column-level check existed on the self-update RLS policy), and a deactivated admin's existing session kept full data access since the ownership check didn't look at `is_active`. Also removes an unintended super-admin bypass on bookings/event types/blocked slots that contradicted this project's own "siloed even from super-admin" decision. **Also re-deploy `update-admin`** — it now handles the one legitimate `is_active` write that used to be a direct client-side table update
 
 After running `0009`, confirm the bucket exists: Supabase Dashboard → Storage → you should see **`admin-photos`** (public, 2 MB limit, JPG/PNG/WebP only). The migration creates it, so there's nothing to click — this is just a check.
 
@@ -148,7 +149,7 @@ Visit `http://localhost:3000` — you should land on `/login`.
 37. Create a code expiring **yesterday** (edit an existing one) → confirm it's rejected and shows **Expired**.
 38. Deactivate a code → confirm it's rejected on the public page and shows **Inactive**.
 39. Book with a discount → check **Bookings**: the Amount column should show the discounted total with a `−20%` marker.
-40. Race check (optional): with a max-uses-1 code, submit two bookings at once from two tabs → exactly one should succeed.
+40. **Race check — not optional, this is the actual concurrency guarantee on a paid event.** With a max-uses-1 code, submit two bookings at once from two tabs (or two devices) for the same paid event type and the same slot → exactly one should succeed, the other should see "already been fully used" or "just booked", and the discount code's `times_used` must stay at 1, never 2.
 
 ---
 
@@ -156,8 +157,7 @@ Visit `http://localhost:3000` — you should land on `/login`.
 
 Before testing payments:
 
-- [ ] `NEXT_PUBLIC_RAZORPAY_KEY_ID` in `.env.local` (done)
-- [ ] `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET` and `PUBLIC_BASE_URL` as Edge Function secrets — see [`supabase/functions/README.md`](supabase/functions/README.md)
+- [ ] `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET` and `PUBLIC_BASE_URL` as Edge Function secrets — see [`supabase/functions/README.md`](supabase/functions/README.md). Note there is nothing to add to `.env.local` for Razorpay — the Key ID comes back from `create-booking`'s response, not a client-side env var.
 - [ ] Deploy `create-booking`, `verify-razorpay-payment`, `razorpay-webhook`, `expire-pending-bookings`, and re-deploy `relay-booking-to-n8n`
 - [ ] Add the webhook in the Razorpay dashboard (URL + secret + the three events) — steps in the functions README
 - [ ] **Change the existing Supabase Database Webhook on `bookings` to fire on `INSERT` *and* `UPDATE`** (Dashboard → Database → Webhooks → edit the one pointing at `relay-booking-to-n8n`)
@@ -211,6 +211,37 @@ No migration — needs `update-admin` and `update-own-profile` re-deployed (see 
 64. Confirm any friendly Edge Function error (a taken slug, a duplicate email) now shows its actual message in the toast — not the generic "Edge Function returned a non-2xx status code" text (this was a pre-existing bug in `updateAdmin`/`updateOwnProfile`, fixed alongside slug editing since it would have swallowed the new "link already taken" message too).
 
 ---
+
+---
+
+## Security fixes — verify these before anything else
+
+Run migration `0014_security_hardening.sql`, then re-deploy `update-admin` (it now also handles `is_active`). These close two real, exploitable gaps found in a full audit pass — both present since the very first migration, neither ever exploited as far as anyone knows, but real enough to verify the fix actually took rather than just trusting the diff.
+
+65. **Privilege escalation is closed.** Log in as a *regular* admin (not super-admin) in the browser, then open DevTools → Application/Storage → Local Storage → find the `sb-<project-ref>-auth-token` entry and copy its `access_token` value. Then, from a terminal:
+    ```bash
+    curl -X PATCH "https://<project-ref>.supabase.co/rest/v1/admins?id=eq.<your-own-admin-id>" \
+      -H "apikey: <your anon key>" \
+      -H "Authorization: Bearer <the access_token you copied>" \
+      -H "Content-Type: application/json" \
+      -d '{"role":"super_admin"}'
+    ```
+    Before the fix this silently succeeded. After it, expect an error (a `42501`/permission-denied on the `role` column) — the row must NOT change. Confirm by checking that admin's row in the SQL editor still shows `role = 'admin'`.
+66. **Deactivate → reactivate still works end to end** from the super-admin's Admins page (this moved from a direct table write to going through `update-admin` — confirm nothing broke).
+67. **A super-admin can no longer deactivate their own account** — try it on your own row from the Admins page; expect a clean "You can't deactivate your own account" error, not a raw one.
+68. **Deactivation actually revokes access now, not just the login screen.** Deactivate an admin who is *currently logged in elsewhere* (a second browser/incognito session) — without logging them out — and confirm that session can no longer load their Bookings/Event Types/Discounts pages (they should now fail to load data, not just still work until they happen to log out and back in).
+69. **Cross-admin data isolation** — with two admin accounts, log in as Admin A and confirm you cannot see Admin B's bookings, event types, blocked slots, discount codes, or enquiries anywhere, including via the super-admin's own login (a super-admin should now only see the admins list itself — name/email/phone/slug/status — not drill into anyone's bookings).
+
+## Other high-value gaps worth testing (found in the same audit, not yet covered by any step above)
+
+Not exhaustive — prioritized by "what would be most damaging if broken in a live demo or with real money."
+
+70. **Retry after a declined card, in the same Checkout session** — this exact bug was found and fixed once already (`payment.failed` was being treated as terminal, silently dropping a successful retry). Use a card Razorpay's test docs mark as "always declined," let it fail, then pay with a working method in the *same* modal — confirm the booking still confirms correctly. This is the single most likely regression to reintroduce silently.
+71. **Kill the tab immediately after a successful payment**, before the browser callback can fire — confirm the webhook alone still confirms the booking (check the Supabase row a minute later, not the UI).
+72. **Approve a reschedule onto a slot someone else is actively paying for** (a `pending_payment` hold, not yet expired) — this is currently a real gap: the reschedule-approval conflict check does not look at live payment holds. Confirm whether it lets the double-booking through; if so, this needs a follow-up fix, not just a test.
+73. **Custom booking questions**, end to end — add one to an event type, confirm it's required correctly on the public booking page, and that the answer shows up on the booking in the dashboard.
+74. **Delete an event type that already has bookings** — confirm it's refused with a clear message pointing at "deactivate instead," not a raw foreign-key error.
+75. **Google Calendar token expired/revoked** — with Calendar connected, revoke access from your Google account settings, then load the public booking page for that admin — confirm slots still show (fail-open), rather than the page breaking.
 
 ## Still to come (not needed yet, listed so nothing is a surprise later)
 

@@ -1,10 +1,20 @@
 // Supabase Edge Function: update-admin
 //
 // Called by the super-admin's "Edit Admin" UI to change an admin's name,
-// email, phone, and/or password. Email and password changes must go through
-// the service role (auth.admin API) so the Supabase Auth user and the
-// `admins` row never drift out of sync. Changing the email also clears the
-// stored Google Calendar connection, forcing a reconnect.
+// email, phone, password, and/or active status. Email and password changes
+// must go through the service role (auth.admin API) so the Supabase Auth
+// user and the `admins` row never drift out of sync. Changing the email
+// also clears the stored Google Calendar connection, forcing a reconnect.
+//
+// `is_active` is handled here rather than as a direct client-side table
+// write on purpose: `role`/`is_active`/`auth_user_id` are revoked from the
+// `authenticated` Postgres role entirely (see migration 0014) after an
+// audit found a logged-in admin could otherwise self-promote to
+// super_admin via a bare `.update({ role: 'super_admin' })` call, since
+// the admins table's self-update RLS policy has no WITH CHECK on column
+// values. Routing the one legitimate is_active write through this
+// service-role function, gated on the caller actually being an active
+// super_admin, closes that off without breaking deactivate/reactivate.
 //
 // Deploy:
 //   supabase functions deploy update-admin
@@ -46,7 +56,7 @@ Deno.serve(async (req) => {
 
   const { data: callerAdmin } = await callerClient
     .from("admins")
-    .select("role, is_active")
+    .select("id, role, is_active")
     .eq("auth_user_id", caller.id)
     .maybeSingle();
 
@@ -54,15 +64,25 @@ Deno.serve(async (req) => {
     return jsonResponse({ error: "Only an active super_admin can edit admins" }, 403);
   }
 
-  const { admin_id, name, email, phone, password, slug } = await req.json();
+  const { admin_id, name, email, phone, password, slug, is_active } = await req.json();
   if (!admin_id) {
     return jsonResponse({ error: "admin_id is required" }, 400);
   }
   if (password && password.length < 8) {
     return jsonResponse({ error: "Password must be at least 8 characters" }, 400);
   }
-  if (!name && !email && !phone && !password && !slug) {
+  if (!name && !email && !phone && !password && !slug && is_active === undefined) {
     return jsonResponse({ error: "Nothing to update" }, 400);
+  }
+  if (is_active !== undefined && typeof is_active !== "boolean") {
+    return jsonResponse({ error: "is_active must be a boolean" }, 400);
+  }
+  // A super_admin can deactivate themselves by mistake through no other
+  // path than this one — block it explicitly rather than let them lock
+  // themselves out with no way back in (every other admin-management
+  // action requires an active super_admin session).
+  if (is_active === false && admin_id === callerAdmin?.id) {
+    return jsonResponse({ error: "You can't deactivate your own account." }, 400);
   }
   let normalizedPhone: string | null = null;
   if (phone) {
@@ -134,6 +154,7 @@ Deno.serve(async (req) => {
   if (email) rowUpdate.email = email;
   if (normalizedPhone) rowUpdate.phone = normalizedPhone;
   if (isSlugChange && normalizedSlug) rowUpdate.slug = normalizedSlug;
+  if (is_active !== undefined) rowUpdate.is_active = is_active;
 
   // Changing the login email forces a Google Calendar reconnect — the
   // admin's identity changed, so re-verifying via a fresh OAuth grant is

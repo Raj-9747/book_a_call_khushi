@@ -49,9 +49,12 @@ supabase secrets set BOOKING_WEBHOOK_SECRET=<a-random-string-you-generate>
 # in the confirmation email. No trailing slash.
 supabase secrets set PUBLIC_BASE_URL=http://localhost:3000
 
-# Razorpay. The Key ID is also in .env.local as NEXT_PUBLIC_RAZORPAY_KEY_ID
-# (it's public by design — it identifies the account when opening Checkout).
-# The other two NEVER go anywhere near the Next.js app.
+# Razorpay. Nothing Razorpay-related goes in .env.local / the Next.js app —
+# `create-booking` returns its own RAZORPAY_KEY_ID in every order-creation
+# response (it's public by design, safe to hand back — it just identifies
+# the account when opening Checkout), so the browser never needs its own
+# copy of it. That also means there's only one place it can drift out of
+# date if you ever rotate keys.
 supabase secrets set RAZORPAY_KEY_ID=<your-razorpay-key-id>
 supabase secrets set RAZORPAY_KEY_SECRET=<your-razorpay-key-secret>
 # You invent this one, then paste the same string into the Razorpay
@@ -96,6 +99,8 @@ The four payment-related functions are deployed with `--no-verify-jwt` because t
 > supabase functions deploy update-admin
 > supabase functions deploy update-own-profile
 > ```
+
+> **Re-deploy needed after migration `0014`:** `update-admin` now also accepts an `is_active` field — the frontend's "deactivate/reactivate admin" action moved here from a direct client-side table write, since migration `0014` revokes client `UPDATE` on `role`/`is_active`/`auth_user_id` entirely (closing a privilege-escalation gap). Re-deploy: `supabase functions deploy update-admin`.
 
 `relay-booking-to-n8n` is deployed with `--no-verify-jwt` because it's called by a Supabase Database Webhook, not by a logged-in user — it authorizes the caller with the `x-webhook-secret` header instead (see `n8n/README.md`). `get-google-busy-times` is also `--no-verify-jwt` since it's called by anonymous public booking-page visitors — it's a read-only, non-sensitive lookup (same trust model as the public RPCs), so no auth check is needed.
 

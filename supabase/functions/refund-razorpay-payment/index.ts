@@ -75,10 +75,8 @@ Deno.serve(async (req) => {
     return jsonResponse({ error: "Razorpay rejected the refund. Please check the payment and try again." }, 502);
   }
 
-  // service_role from here: stamping refund status and resolving the
-  // change request both touch rows the admin already owns, but doing it
-  // as one atomic-ish sequence server-side avoids a half-applied state if
-  // the browser drops connection right after the refund call above.
+  // service_role for the booking itself — ownership of `booking_id` was
+  // already established above via the RLS-scoped read.
   const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
 
   await admin
@@ -90,10 +88,16 @@ Deno.serve(async (req) => {
     .eq("id", booking_id);
 
   if (request_id) {
-    await admin
+    // Deliberately the RLS-scoped `callerClient`, not the service-role one:
+    // `request_id` is client-supplied and otherwise unverified. Filtering
+    // on `booking_id` too (not just `id`) means this can only ever resolve
+    // the request that actually belongs to the booking just refunded above
+    // — not some other pending request the caller happens to also own.
+    await callerClient
       .from("booking_change_requests")
       .update({ status: "approved", admin_note: admin_note || null, resolved_at: new Date().toISOString() })
-      .eq("id", request_id);
+      .eq("id", request_id)
+      .eq("booking_id", booking_id);
   }
 
   return jsonResponse({ refunded: refundAmount });

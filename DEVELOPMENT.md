@@ -44,11 +44,17 @@ Not exhaustive, but the standing checklist before calling a feature "done":
 Because features share the auth/layout foundation, a change in one area can silently break another. After any change, spot-check:
 
 1. **Login** — super-admin and a regular admin can both log in and land on the correct section (`/admin` vs `/dashboard`).
-2. **Nav/logout** — sidebar nav links work, logout works, mobile hamburger opens/closes the drawer.
-3. **Manage Admins** (super-admin) — add, edit (name/email/password reset), deactivate/reactivate, remove all still work; duplicate email gives the clean error.
-4. **Settings** — change-password form works for both roles.
-5. **Responsive check** — resize to ~375px width on at least the page you changed and one you didn't, confirm nothing overflows/clips.
-6. **Build check** — `npm run lint` and `npm run build` both pass clean before considering a change finished.
+2. **Nav/logout** — sidebar nav links work, logout works, mobile hamburger opens/closes the drawer, the Requests badge count is right.
+3. **Manage Admins** (super-admin) — add, edit (name/email/password/slug), deactivate/reactivate, remove all still work; duplicate email/slug gives a clean error, not a raw DB one.
+4. **Profile** — change-password form works for both roles; the public-profile fields, booking-link editor, and the accepting-bookings toggle all still save.
+5. **A full paid booking, end to end** — pick a slot on `/book/<slug>/<event>` → apply a discount code → pay with a Razorpay test card → confirm the booking lands as `confirmed` with the right amount, exactly one confirmation email goes out, and (if Calendar is connected) a Meet link gets created.
+6. **A full free booking, end to end** — same flow with a ₹0 event type, confirming Razorpay is never invoked.
+7. **The magic link → request → approval loop** — open a booking's `/booking/[token]` link, submit a reschedule request, approve it from `/dashboard/requests`, confirm the booking's time updates and a fresh confirmation email goes out.
+8. **Data isolation** — log in as a second admin and confirm they cannot see the first admin's bookings, event types, discount codes, or enquiries anywhere in the UI (this is the one category of bug that's easy to introduce silently in an RLS policy and easy to miss in normal testing, since it only shows up when you deliberately check as a *different* user).
+9. **Responsive check** — resize to ~375px width on at least the page you changed and one you didn't, confirm nothing overflows/clips.
+10. **Build check** — `npm run lint` and `npm run build` both pass clean before considering a change finished.
+
+A fuller, numbered manual test script lives in [SETUP.md](SETUP.md) (steps 1–64+) — this section is the fast subset to run after *any* change, not a replacement for it.
 
 ## 5. Where things live (avoid duplicating)
 
