@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { ExternalLink, Pencil } from "lucide-react";
+import { Check, Copy, ExternalLink, Pencil } from "lucide-react";
 import { Button, Card, CardContent, CardDescription, CardHeader, CardTitle, FormField, Input, useConfirm } from "@/components/ui";
 import { updateOwnProfile } from "@/lib/api/admins";
 import { slugSchema } from "@/lib/validations/slug";
@@ -20,6 +20,37 @@ export function PublicLinkCard({ admin }: { admin: Admin }) {
   const [value, setValue] = useState(admin.slug);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [copied, setCopied] = useState(false);
+  // Empty until mount so the server and client render the same markup —
+  // window.location doesn't exist during SSR, and interpolating it directly
+  // would be a hydration mismatch.
+  const [origin, setOrigin] = useState("");
+
+  useEffect(() => {
+    function readOrigin() {
+      setOrigin(window.location.origin);
+    }
+    readOrigin();
+  }, []);
+
+  // Reset the "Copied" label shortly after, so the button doesn't sit there
+  // claiming success forever.
+  useEffect(() => {
+    if (!copied) return;
+    const timer = setTimeout(() => setCopied(false), 2000);
+    return () => clearTimeout(timer);
+  }, [copied]);
+
+  async function handleCopy() {
+    try {
+      await navigator.clipboard.writeText(`${window.location.origin}/book/${admin.slug}`);
+      setCopied(true);
+    } catch {
+      // Clipboard access can be blocked (insecure origin, permissions) —
+      // the URL is visible above either way, so this is recoverable.
+      toast.error("Couldn't copy — select the link above and copy it manually.");
+    }
+  }
 
   function startEditing() {
     setValue(admin.slug);
@@ -92,20 +123,38 @@ export function PublicLinkCard({ admin }: { admin: Admin }) {
             </div>
           </div>
         ) : (
-          <div className="flex items-center justify-between gap-3">
-            <a
-              href={`/book/${admin.slug}`}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex items-center gap-1.5 text-sm font-medium text-brand-600 hover:underline"
-            >
-              /book/{admin.slug}
-              <ExternalLink className="h-3.5 w-3.5" />
-            </a>
-            <Button type="button" variant="outline" size="sm" onClick={startEditing}>
-              <Pencil className="h-3.5 w-3.5" />
-              Edit
-            </Button>
+          <div className="space-y-3">
+            {/* The full URL, shown the way you'd paste it to a client —
+                selectable, and wrapping rather than truncating so a long
+                slug is still readable in full. */}
+            <p className="break-all rounded-md border border-border bg-surface-muted px-3 py-2.5 font-mono text-sm text-neutral-700">
+              {origin}/book/{admin.slug}
+            </p>
+
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" variant="outline" size="sm" onClick={handleCopy}>
+                {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+                {copied ? "Copied" : "Copy link"}
+              </Button>
+
+              {/* An <a> styled as a button rather than a Button wrapping a
+                  link — nesting interactive elements is invalid, and this
+                  keeps middle-click / "open in new tab" working properly. */}
+              <a
+                href={`/book/${admin.slug}`}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border-strong bg-surface px-3 text-sm font-medium text-neutral-800 transition-colors hover:bg-neutral-50"
+              >
+                <ExternalLink className="h-3.5 w-3.5" />
+                View page
+              </a>
+
+              <Button type="button" variant="outline" size="sm" onClick={startEditing}>
+                <Pencil className="h-3.5 w-3.5" />
+                Edit
+              </Button>
+            </div>
           </div>
         )}
       </CardContent>

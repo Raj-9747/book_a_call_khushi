@@ -1,7 +1,8 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
-import { THEME_STORAGE_KEY, type Theme } from "@/lib/theme";
+import { usePathname } from "next/navigation";
+import { isThemedRoute, THEME_STORAGE_KEY, type Theme } from "@/lib/theme";
 
 export type { Theme };
 
@@ -12,36 +13,41 @@ interface ThemeContextValue {
 
 const ThemeContext = createContext<ThemeContextValue | null>(null);
 
-function applyTheme(theme: Theme) {
-  document.documentElement.classList.toggle("dark", theme === "dark");
-}
-
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  // Always starts "light" to match what the server rendered. The real value
-  // is read from the DOM in the effect below — the boot script in the
-  // document head has already applied the stored theme by then, so this
-  // only syncs React's copy of it and never causes a hydration mismatch.
+  // Starts "light" to match what the server rendered; the real preference
+  // is read from storage on mount below, so there's no hydration mismatch.
   const [theme, setTheme] = useState<Theme>("light");
+  const pathname = usePathname();
 
   useEffect(() => {
     // Wrapped rather than called straight in the effect body — this
     // project's lint config rejects a bare synchronous setState there
     // (react-hooks/set-state-in-effect).
-    function syncFromDom() {
-      setTheme(document.documentElement.classList.contains("dark") ? "dark" : "light");
+    function loadStoredTheme() {
+      try {
+        setTheme(window.localStorage.getItem(THEME_STORAGE_KEY) === "dark" ? "dark" : "light");
+      } catch {
+        // Storage blocked (private mode) — light is a fine fallback.
+      }
     }
-    syncFromDom();
+    loadStoredTheme();
   }, []);
+
+  // The single place the class is applied. Keyed on the route as well as the
+  // preference, so navigating from the dashboard to a public booking page
+  // drops dark mode and navigating back restores it.
+  useEffect(() => {
+    const shouldBeDark = theme === "dark" && isThemedRoute(pathname ?? "");
+    document.documentElement.classList.toggle("dark", shouldBeDark);
+  }, [theme, pathname]);
 
   const toggleTheme = useCallback(() => {
     setTheme((current) => {
       const next: Theme = current === "dark" ? "light" : "dark";
-      applyTheme(next);
       try {
         window.localStorage.setItem(THEME_STORAGE_KEY, next);
       } catch {
-        // Private mode / storage disabled — the theme still applies for
-        // this session, it just won't be remembered.
+        // Preference won't persist, but the toggle still works this session.
       }
       return next;
     });

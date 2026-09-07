@@ -5,7 +5,7 @@ import { ConfirmProvider } from "@/components/ui";
 import { ThemeProvider } from "@/components/theme/ThemeProvider";
 // From a plain module, not the "use client" ThemeProvider — see the note in
 // src/lib/theme.ts for why that distinction matters here.
-import { THEME_STORAGE_KEY } from "@/lib/theme";
+import { THEME_STORAGE_KEY, THEMED_ROUTE_PREFIXES } from "@/lib/theme";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -27,10 +27,17 @@ export const metadata: Metadata = {
 // never sees a white flash on load. Deliberately tiny and dependency-free —
 // it only reads one localStorage key and toggles one class. Wrapped in
 // try/catch because storage access throws outright in some privacy modes.
+//
+// The path check mirrors `isThemedRoute`: dark mode is scoped to the admin
+// workspace, so a dark-mode admin opening their own public booking page
+// must not get a dark flash before React corrects it.
 const THEME_BOOT_SCRIPT = `
 (function() {
   try {
-    if (localStorage.getItem('${THEME_STORAGE_KEY}') === 'dark') {
+    var prefixes = ${JSON.stringify(THEMED_ROUTE_PREFIXES)};
+    var path = window.location.pathname;
+    var themed = prefixes.some(function (p) { return path === p || path.indexOf(p + '/') === 0; });
+    if (themed && localStorage.getItem('${THEME_STORAGE_KEY}') === 'dark') {
       document.documentElement.classList.add('dark');
     }
   } catch (e) {}
