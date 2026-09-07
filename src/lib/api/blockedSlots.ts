@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/client";
-import type { BlockedSlotFormValues } from "@/lib/validations/blockedSlot";
+import { expandOccurrenceDates, type BlockedSlotFormValues } from "@/lib/validations/blockedSlot";
 import type { BlockedSlot } from "@/types/models";
 
 export async function listBlockedSlots(adminId: string): Promise<BlockedSlot[]> {
@@ -32,27 +32,50 @@ async function syncToCalendar(action: "create" | "delete", blockedSlotId: string
   }
 }
 
-export async function createBlockedSlot(adminId: string, input: BlockedSlotFormValues): Promise<BlockedSlot> {
+/** Creates one block, or a whole repeating series sharing a
+ * `recurrence_group_id`. Returns every row created, earliest first. */
+export async function createBlockedSlot(adminId: string, input: BlockedSlotFormValues): Promise<BlockedSlot[]> {
   const startTime = input.allDay ? "00:00" : input.startTime;
   const endTime = input.allDay ? "23:59" : input.endTime;
 
+  const dates = expandOccurrenceDates(input);
+  const isSeries = dates.length > 1;
+  const groupId = isSeries ? crypto.randomUUID() : null;
+
+  const rows = dates.map((date) => ({
+    admin_id: adminId,
+    start_time: istDateTimeToIso(date, startTime),
+    end_time: istDateTimeToIso(date, endTime),
+    reason: input.reason || null,
+    recurrence_group_id: groupId,
+  }));
+
   const supabase = createClient();
-  const { data, error } = await supabase
-    .from("blocked_slots")
-    .insert({
-      admin_id: adminId,
-      start_time: istDateTimeToIso(input.date, startTime),
-      end_time: istDateTimeToIso(input.date, endTime),
-      reason: input.reason || null,
-    })
-    .select()
-    .single();
+  const { data, error } = await supabase.from("blocked_slots").insert(rows).select();
 
-  if (error) throw error;
-  const blockedSlot = data as BlockedSlot;
+  if (error) {
+    // 23P01 = exclusion-constraint violation, i.e. this range overlaps a
+    // block that already exists (migration 0016). Far more useful than the
+    // raw Postgres text, and the single most likely thing to go wrong here
+    // now that repeats can generate dozens of rows at once.
+    if (error.code === "23P01") {
+      throw new Error(
+        isSeries
+          ? "One or more dates in that series overlap time you've already blocked. Nothing was saved — adjust the dates or remove the existing block first."
+          : "That overlaps time you've already blocked."
+      );
+    }
+    throw error;
+  }
 
-  await syncToCalendar("create", blockedSlot.id);
-  return blockedSlot;
+  const created = (data ?? []) as BlockedSlot[];
+
+  // In parallel: a 20-occurrence series shouldn't take 20× as long to save.
+  // allSettled because Calendar sync is best-effort — a failure there must
+  // never make the block itself look like it failed.
+  await Promise.allSettled(created.map((slot) => syncToCalendar("create", slot.id)));
+
+  return created.sort((a, b) => a.start_time.localeCompare(b.start_time));
 }
 
 export async function deleteBlockedSlot(id: string): Promise<void> {
@@ -62,5 +85,21 @@ export async function deleteBlockedSlot(id: string): Promise<void> {
 
   const supabase = createClient();
   const { error } = await supabase.from("blocked_slots").delete().eq("id", id);
+  if (error) throw error;
+}
+
+/** Removes an entire repeating series in one go — deleting 30 occurrences
+ * one row at a time from the UI would be miserable. */
+export async function deleteBlockedSlotSeries(recurrenceGroupId: string): Promise<void> {
+  const supabase = createClient();
+  const { data, error: fetchError } = await supabase
+    .from("blocked_slots")
+    .select("id")
+    .eq("recurrence_group_id", recurrenceGroupId);
+  if (fetchError) throw fetchError;
+
+  await Promise.allSettled(((data ?? []) as { id: string }[]).map((row) => syncToCalendar("delete", row.id)));
+
+  const { error } = await supabase.from("blocked_slots").delete().eq("recurrence_group_id", recurrenceGroupId);
   if (error) throw error;
 }

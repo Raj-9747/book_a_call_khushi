@@ -270,6 +270,9 @@ export function BookingFlow({ admin, eventType }: { admin: PublicAdmin; eventTyp
             ? formatInTimeZone(selectedSlot, visitorTimeZone, "EEEE, MMMM d 'at' h:mm a")
             : undefined
         }
+        // A misclick outside must not discard a client's typed details
+        // mid-booking — they'd have to retype everything, or worse, give up.
+        dismissible={false}
       >
         {showPaymentStep && details && total > 0 ? (
           <div className="space-y-4">

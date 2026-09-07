@@ -36,7 +36,7 @@ export function EditAdminModal({
     register,
     handleSubmit,
     reset,
-    formState: { errors },
+    formState: { errors, isDirty },
   } = useForm<FormInput, unknown, FormValues>({ resolver: zodResolver(schema) });
 
   useEffect(() => {
@@ -94,6 +94,7 @@ export function EditAdminModal({
       onClose={onClose}
       title="Edit admin"
       description="Update their details, or set a new password to reset it."
+      dismissible={!isDirty}
     >
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
         <FormField label="Full name" htmlFor="edit-name" error={errors.name?.message} required>

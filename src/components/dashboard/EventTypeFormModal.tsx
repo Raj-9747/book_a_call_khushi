@@ -122,7 +122,7 @@ export function EventTypeFormModal({
     control,
     handleSubmit,
     reset,
-    formState: { errors },
+    formState: { errors, isDirty },
   } = useForm<EventTypeFormInput, unknown, EventTypeFormValues>({
     resolver: zodResolver(eventTypeFormSchema),
     defaultValues: toFormValues(eventType),
@@ -158,6 +158,7 @@ export function EventTypeFormModal({
       title={isEdit ? "Edit event type" : "New event type"}
       description={isEdit ? undefined : "Clients will pick this when booking a call with you."}
       className="max-w-lg"
+      dismissible={!isDirty}
     >
       <form onSubmit={handleSubmit(onSubmit)} noValidate>
         <div className="max-h-[65vh] space-y-4 overflow-y-auto pr-1">

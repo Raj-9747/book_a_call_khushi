@@ -6,7 +6,8 @@ import { formatInTimeZone } from "date-fns-tz";
 import { CalendarClock, Inbox, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/layout/PageHeader";
-import { Badge, Spinner } from "@/components/ui";
+import { Badge, Pagination, Spinner } from "@/components/ui";
+import { usePagination } from "@/lib/usePagination";
 import { listChangeRequests, type ChangeRequestWithBooking } from "@/lib/api/changeRequests";
 import { ResolveRequestModal } from "./ResolveRequestModal";
 
@@ -33,6 +34,17 @@ export function RequestsManager({ adminId }: { adminId: string }) {
 
   const pending = requests?.filter((r) => r.status === "pending") ?? [];
   const resolved = requests?.filter((r) => r.status !== "pending") ?? [];
+
+  // Only the resolved history is paginated. Pending is the actual work
+  // queue — it should stay short, and hiding half of it behind a pager
+  // would be the wrong default for the one list the admin must act on.
+  const {
+    page: resolvedPage,
+    setPage: setResolvedPage,
+    pageSize: resolvedPageSize,
+    totalCount: resolvedTotal,
+    pageItems: resolvedPageItems,
+  } = usePagination(resolved);
 
   return (
     <>
@@ -62,9 +74,17 @@ export function RequestsManager({ adminId }: { adminId: string }) {
           <div>
             <h2 className="mb-3 text-sm font-medium text-neutral-500">Resolved</h2>
             <div className="space-y-3 opacity-70">
-              {resolved.map((request) => (
+              {resolvedPageItems.map((request) => (
                 <RequestRow key={request.id} request={request} />
               ))}
+            </div>
+            <div className="mt-2 overflow-hidden rounded-xl border border-border bg-surface">
+              <Pagination
+                page={resolvedPage}
+                pageSize={resolvedPageSize}
+                totalCount={resolvedTotal}
+                onPageChange={setResolvedPage}
+              />
             </div>
           </div>
         )}

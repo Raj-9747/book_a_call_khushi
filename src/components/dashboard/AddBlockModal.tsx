@@ -4,10 +4,12 @@ import { useState } from "react";
 import { Controller, useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
-import { Modal, Button, DatePicker, FormField, Input, Switch, TimeInput } from "@/components/ui";
+import { Modal, Button, DatePicker, FormField, Input, Select, Switch, TimeInput } from "@/components/ui";
 import {
   blockedSlotFormSchema,
   DEFAULT_BLOCKED_SLOT_FORM,
+  MAX_OCCURRENCES,
+  REPEAT_OPTIONS,
   type BlockedSlotFormValues,
 } from "@/lib/validations/blockedSlot";
 import { createBlockedSlot } from "@/lib/api/blockedSlots";
@@ -22,7 +24,9 @@ export function AddBlockModal({
   open: boolean;
   adminId: string;
   onClose: () => void;
-  onCreated: (slot: BlockedSlot) => void;
+  /** Receives every row created — one for a single block, many for a
+   * repeating series. */
+  onCreated: (slots: BlockedSlot[]) => void;
 }) {
   const [submitting, setSubmitting] = useState(false);
 
@@ -31,13 +35,14 @@ export function AddBlockModal({
     control,
     handleSubmit,
     reset,
-    formState: { errors },
+    formState: { errors, isDirty },
   } = useForm<BlockedSlotFormValues>({
     resolver: zodResolver(blockedSlotFormSchema),
     defaultValues: DEFAULT_BLOCKED_SLOT_FORM,
   });
 
   const allDay = useWatch({ control, name: "allDay" });
+  const repeat = useWatch({ control, name: "repeat" });
 
   function handleClose() {
     reset(DEFAULT_BLOCKED_SLOT_FORM);
@@ -47,9 +52,9 @@ export function AddBlockModal({
   async function onSubmit(values: BlockedSlotFormValues) {
     setSubmitting(true);
     try {
-      const slot = await createBlockedSlot(adminId, values);
-      toast.success("Time blocked");
-      onCreated(slot);
+      const slots = await createBlockedSlot(adminId, values);
+      toast.success(slots.length > 1 ? `Blocked ${slots.length} dates` : "Time blocked");
+      onCreated(slots);
       handleClose();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to block time");
@@ -59,7 +64,13 @@ export function AddBlockModal({
   }
 
   return (
-    <Modal open={open} onClose={handleClose} title="Block time off" description="Clients won't be able to book during this window.">
+    <Modal
+      open={open}
+      onClose={handleClose}
+      title="Block time off"
+      description="Clients won't be able to book during this window."
+      dismissible={!isDirty}
+    >
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
         <FormField label="Date" htmlFor="block-date" error={errors.date?.message} required>
           <Controller
@@ -95,6 +106,37 @@ export function AddBlockModal({
               />
             </FormField>
           </div>
+        )}
+
+        <FormField
+          label="Repeats"
+          error={errors.repeat?.message}
+          hint="For standing commitments — a weekly client call, a monthly review."
+        >
+          <Controller
+            control={control}
+            name="repeat"
+            render={({ field }) => (
+              <Select value={field.value} onChange={field.onChange} options={[...REPEAT_OPTIONS]} />
+            )}
+          />
+        </FormField>
+
+        {repeat !== "none" && (
+          <FormField
+            label="Repeat until"
+            error={errors.repeatUntil?.message}
+            hint={`Creates one block per occurrence, up to ${MAX_OCCURRENCES}.`}
+            required
+          >
+            <Controller
+              control={control}
+              name="repeatUntil"
+              render={({ field }) => (
+                <DatePicker value={field.value} onChange={field.onChange} minDate={new Date()} />
+              )}
+            />
+          </FormField>
         )}
 
         <FormField label="Reason (optional)" htmlFor="block-reason" error={errors.reason?.message}>

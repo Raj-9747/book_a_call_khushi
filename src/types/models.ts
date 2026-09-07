@@ -130,5 +130,10 @@ export interface BlockedSlot {
   end_time: string;
   reason: string | null;
   google_event_id?: string | null;
+  /** Set when this row is one occurrence of a repeating block. All
+   * occurrences in a series share the same id, which is how the UI groups
+   * them into a single row and how "delete series" finds them. Null for a
+   * one-off block. */
+  recurrence_group_id?: string | null;
   created_at: string;
 }

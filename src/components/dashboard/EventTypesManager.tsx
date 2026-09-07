@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import { Plus } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/layout/PageHeader";
-import { Button, Spinner, useConfirm } from "@/components/ui";
+import { Button, Pagination, Spinner, useConfirm } from "@/components/ui";
+import { usePagination } from "@/lib/usePagination";
 import { deleteEventType, listEventTypes, setEventTypeActive } from "@/lib/api/eventTypes";
 import { EventTypesList } from "./EventTypesList";
 import { EventTypeFormModal } from "./EventTypeFormModal";
@@ -16,6 +17,7 @@ export function EventTypesManager({ adminId, adminSlug }: { adminId: string; adm
   const [formOpen, setFormOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<EventType | null>(null);
   const confirm = useConfirm();
+  const { page, setPage, pageSize, totalCount, pageItems } = usePagination(eventTypes ?? []);
 
   useEffect(() => {
     listEventTypes(adminId)
@@ -78,14 +80,21 @@ export function EventTypesManager({ adminId, adminSlug }: { adminId: string; adm
             <Spinner className="h-6 w-6 text-neutral-400" />
           </div>
         ) : (
-          <EventTypesList
-            adminSlug={adminSlug}
-            eventTypes={eventTypes}
-            busyId={busyId}
-            onEdit={openEdit}
-            onToggleActive={handleToggleActive}
-            onDelete={handleDelete}
-          />
+          <>
+            <EventTypesList
+              adminSlug={adminSlug}
+              eventTypes={pageItems}
+              busyId={busyId}
+              onEdit={openEdit}
+              onToggleActive={handleToggleActive}
+              onDelete={handleDelete}
+            />
+            {totalCount > pageSize && (
+              <div className="mt-4 overflow-hidden rounded-xl border border-border bg-surface">
+                <Pagination page={page} pageSize={pageSize} totalCount={totalCount} onPageChange={setPage} />
+              </div>
+            )}
+          </>
         )}
       </div>
 

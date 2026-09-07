@@ -49,7 +49,7 @@ export function DiscountFormModal({
     handleSubmit,
     reset,
     setValue,
-    formState: { errors },
+    formState: { errors, isDirty },
   } = useForm<DiscountCodeFormInput, unknown, DiscountCodeFormValues>({
     resolver: zodResolver(discountCodeSchema),
     defaultValues: EMPTY,
@@ -114,6 +114,7 @@ export function DiscountFormModal({
       title={editing ? "Edit discount code" : "New discount code"}
       description="Percent off, for the sessions you choose."
       className="max-w-lg"
+      dismissible={!isDirty}
     >
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
         <div className="grid gap-4 sm:grid-cols-2">

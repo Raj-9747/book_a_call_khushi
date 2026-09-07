@@ -33,7 +33,7 @@ export function AddAdminModal({
     register,
     handleSubmit,
     reset,
-    formState: { errors },
+    formState: { errors, isDirty },
   } = useForm<FormInput, unknown, FormValues>({ resolver: zodResolver(schema) });
 
   function handleClose() {
@@ -64,6 +64,7 @@ export function AddAdminModal({
       onClose={handleClose}
       title="Add an admin"
       description="Set their login email and an initial password — share it with them yourself."
+      dismissible={!isDirty}
     >
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
         <FormField label="Full name" htmlFor="name" error={errors.name?.message} required>

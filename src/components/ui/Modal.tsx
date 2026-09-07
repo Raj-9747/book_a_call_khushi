@@ -12,6 +12,7 @@ export function Modal({
   description,
   children,
   className,
+  dismissible = true,
 }: {
   open: boolean;
   onClose: () => void;
@@ -19,23 +20,36 @@ export function Modal({
   description?: string;
   children: ReactNode;
   className?: string;
+  /** Whether a backdrop click or Escape closes the dialog.
+   *
+   * Set this to false while a form has unsaved input: a stray click just
+   * outside a modal used to wipe everything typed into it, with no undo and
+   * no warning. The X and Cancel buttons always work regardless, so the
+   * dialog is never a trap — it just stops losing work to a misclick. */
+  dismissible?: boolean;
 }) {
   useEffect(() => {
     if (!open) return;
-    const onKeyDown = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && dismissible) onClose();
+    };
     document.addEventListener("keydown", onKeyDown);
     document.body.style.overflow = "hidden";
     return () => {
       document.removeEventListener("keydown", onKeyDown);
       document.body.style.overflow = "";
     };
-  }, [open, onClose]);
+  }, [open, onClose, dismissible]);
 
   if (!open || typeof document === "undefined") return null;
 
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-[2px]" onClick={onClose} aria-hidden="true" />
+      <div
+        className="fixed inset-0 bg-slate-900/50 backdrop-blur-[2px]"
+        onClick={dismissible ? onClose : undefined}
+        aria-hidden="true"
+      />
       <div
         role="dialog"
         aria-modal="true"

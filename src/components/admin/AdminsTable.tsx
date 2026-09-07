@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { CalendarCheck2, CalendarX2, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import { ActionsMenu, Avatar, Badge, useConfirm } from "@/components/ui";
+import { ActionsMenu, Avatar, Badge, Pagination, useConfirm } from "@/components/ui";
+import { usePagination } from "@/lib/usePagination";
 import { removeAdmin, setAdminActive } from "@/lib/api/admins";
 import { EditAdminModal } from "./EditAdminModal";
 import type { Admin } from "@/types/models";
@@ -18,6 +19,7 @@ export function AdminsTable({
   const [busyId, setBusyId] = useState<string | null>(null);
   const [editingAdmin, setEditingAdmin] = useState<Admin | null>(null);
   const confirm = useConfirm();
+  const { page, setPage, pageSize, totalCount, pageItems } = usePagination(admins);
 
   async function handleToggleActive(admin: Admin) {
     setBusyId(admin.id);
@@ -77,7 +79,7 @@ export function AdminsTable({
           </tr>
         </thead>
         <tbody>
-          {admins.map((admin) => (
+          {pageItems.map((admin) => (
             <tr key={admin.id} className="border-b border-border last:border-0">
               <td className="px-6 py-3.5">
                 <div className="flex items-center gap-3">
@@ -128,6 +130,7 @@ export function AdminsTable({
         </tbody>
       </table>
       </div>
+      <Pagination page={page} pageSize={pageSize} totalCount={totalCount} onPageChange={setPage} />
       <EditAdminModal
         admin={editingAdmin}
         onClose={() => setEditingAdmin(null)}

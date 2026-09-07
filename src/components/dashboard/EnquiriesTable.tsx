@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import { formatInTimeZone } from "date-fns-tz";
 import { CheckCircle2, MailCheck, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import { ActionsMenu, Badge, Spinner, useConfirm } from "@/components/ui";
+import { ActionsMenu, Badge, Pagination, Spinner, useConfirm } from "@/components/ui";
+import { usePagination } from "@/lib/usePagination";
 import { deleteEnquiry, listEnquiries, setEnquiryStatus, type EnquiryWithEventType } from "@/lib/api/enquiries";
 import type { EnquiryStatus } from "@/types/models";
 
@@ -22,6 +23,7 @@ export function EnquiriesTable({ adminId }: { adminId: string }) {
   const [enquiries, setEnquiries] = useState<EnquiryWithEventType[] | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const confirm = useConfirm();
+  const { page, setPage, pageSize, totalCount, pageItems } = usePagination(enquiries ?? []);
 
   useEffect(() => {
     listEnquiries(adminId)
@@ -89,7 +91,7 @@ export function EnquiriesTable({ adminId }: { adminId: string }) {
             </tr>
           </thead>
           <tbody>
-            {enquiries.map((enquiry) => (
+            {pageItems.map((enquiry) => (
               <tr key={enquiry.id} className="border-b border-border last:border-0 hover:bg-neutral-50">
                 <td className="px-6 py-3.5">
                   <p className="font-medium text-neutral-900">{enquiry.name}</p>
@@ -141,6 +143,7 @@ export function EnquiriesTable({ adminId }: { adminId: string }) {
           </tbody>
         </table>
       </div>
+      <Pagination page={page} pageSize={pageSize} totalCount={totalCount} onPageChange={setPage} />
     </div>
   );
 }

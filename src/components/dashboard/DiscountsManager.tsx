@@ -2,10 +2,11 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { formatInTimeZone } from "date-fns-tz";
-import { Pencil, Plus, Power, Tag, Trash2 } from "lucide-react";
+import { Pencil, Plus, Power, Search, Tag, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/layout/PageHeader";
-import { ActionsMenu, Badge, Button, Spinner, useConfirm } from "@/components/ui";
+import { ActionsMenu, Badge, Button, Input, Pagination, Select, Spinner, useConfirm } from "@/components/ui";
+import { usePagination } from "@/lib/usePagination";
 import {
   deleteDiscountCode,
   listDiscountCodes,
@@ -16,6 +17,14 @@ import type { DiscountCodeWithEvents, EventType } from "@/types/models";
 import { DiscountFormModal } from "./DiscountFormModal";
 
 const IST = "Asia/Kolkata";
+
+const STATUS_OPTIONS = [
+  { value: "all", label: "All statuses" },
+  { value: "Active", label: "Active" },
+  { value: "Inactive", label: "Inactive" },
+  { value: "Expired", label: "Expired" },
+  { value: "Used up", label: "Used up" },
+];
 
 type Health = { label: string; tone: "success" | "neutral" | "warning" | "danger" };
 
@@ -47,6 +56,28 @@ export function DiscountsManager({ adminId }: { adminId: string }) {
         /* Non-fatal — the form falls back to "all sessions" only. */
       });
   }, [adminId]);
+
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [eventTypeFilter, setEventTypeFilter] = useState("all");
+
+  // Filtered in memory rather than re-queried — the list is small enough
+  // that a round trip per keystroke would be slower than just slicing it,
+  // and it keeps the derived "status" filter (which isn't a column) simple.
+  const filteredCodes = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    return (codes ?? []).filter((code) => {
+      if (query && !code.code.toLowerCase().includes(query)) return false;
+      if (statusFilter !== "all" && health(code).label !== statusFilter) return false;
+      if (eventTypeFilter !== "all") {
+        // An "all sessions" code legitimately matches any event-type filter.
+        if (!code.applies_to_all && !code.event_type_ids.includes(eventTypeFilter)) return false;
+      }
+      return true;
+    });
+  }, [codes, search, statusFilter, eventTypeFilter]);
+
+  const { page, setPage, pageSize, totalCount, pageItems } = usePagination(filteredCodes);
 
   const eventTypeNames = useMemo(
     () => new Map(eventTypes.map((et) => [et.id, et.name])),
@@ -135,6 +166,35 @@ export function DiscountsManager({ adminId }: { adminId: string }) {
             </Button>
           </div>
         ) : (
+          <div className="space-y-4">
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <div className="relative flex-1">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400" />
+                <Input
+                  placeholder="Search by code..."
+                  className="pl-9 uppercase"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                />
+              </div>
+              <Select className="sm:w-44" value={statusFilter} onChange={setStatusFilter} options={STATUS_OPTIONS} />
+              <Select
+                className="sm:w-52"
+                value={eventTypeFilter}
+                onChange={setEventTypeFilter}
+                options={[
+                  { value: "all", label: "All event types" },
+                  ...eventTypes.map((et) => ({ value: et.id, label: et.name })),
+                ]}
+              />
+            </div>
+
+            {filteredCodes.length === 0 ? (
+              <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border-strong bg-surface py-16 text-center">
+                <p className="text-sm font-medium text-neutral-900">No codes match your filters</p>
+                <p className="mt-1 text-sm text-neutral-500">Try clearing the search or filters above.</p>
+              </div>
+            ) : (
           <div className="overflow-hidden rounded-xl border border-border bg-surface">
             <div className="overflow-x-auto">
               <table className="w-full min-w-[760px] text-sm">
@@ -149,7 +209,7 @@ export function DiscountsManager({ adminId }: { adminId: string }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {codes.map((code) => {
+                  {pageItems.map((code) => {
                     const status = health(code);
                     const scope = code.applies_to_all
                       ? "All sessions"
@@ -178,19 +238,33 @@ export function DiscountsManager({ adminId }: { adminId: string }) {
                         <td className="px-6 py-3.5">
                           <Badge tone={status.tone}>{status.label}</Badge>
                         </td>
-                        <td className="px-6 py-3.5 text-right">
-                          <ActionsMenu
-                            disabled={busyId === code.id}
-                            items={[
-                              { label: "Edit", icon: Pencil, onClick: () => openEdit(code) },
-                              {
-                                label: code.is_active ? "Deactivate" : "Activate",
-                                icon: Power,
-                                onClick: () => handleToggle(code),
-                              },
-                              { label: "Delete", icon: Trash2, tone: "danger", onClick: () => handleDelete(code) },
-                            ]}
-                          />
+                        <td className="px-6 py-3.5">
+                          {/* Edit pulled out of the overflow menu and into
+                              the empty space beside it — it's by far the
+                              most-used action here, and burying the common
+                              one behind a menu costs two clicks every time. */}
+                          <div className="flex items-center justify-end gap-1">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              disabled={busyId === code.id}
+                              onClick={() => openEdit(code)}
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                              Edit
+                            </Button>
+                            <ActionsMenu
+                              disabled={busyId === code.id}
+                              items={[
+                                {
+                                  label: code.is_active ? "Deactivate" : "Activate",
+                                  icon: Power,
+                                  onClick: () => handleToggle(code),
+                                },
+                                { label: "Delete", icon: Trash2, tone: "danger", onClick: () => handleDelete(code) },
+                              ]}
+                            />
+                          </div>
                         </td>
                       </tr>
                     );
@@ -198,6 +272,9 @@ export function DiscountsManager({ adminId }: { adminId: string }) {
                 </tbody>
               </table>
             </div>
+            <Pagination page={page} pageSize={pageSize} totalCount={totalCount} onPageChange={setPage} />
+          </div>
+            )}
           </div>
         )}
       </div>
