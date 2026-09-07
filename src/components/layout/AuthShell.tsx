@@ -59,7 +59,7 @@ export function AuthShell({
 
       {/* Brand panel — decorative, so it simply disappears on smaller screens
           rather than pushing the form down the page. */}
-      <div className="relative hidden overflow-hidden bg-neutral-900 lg:flex lg:w-[54%] lg:flex-col lg:justify-center lg:px-16 xl:px-24">
+      <div className="relative hidden overflow-hidden bg-slate-900 lg:flex lg:w-[54%] lg:flex-col lg:justify-center lg:px-16 xl:px-24">
         <div
           aria-hidden="true"
           className="pointer-events-none absolute inset-0 bg-[radial-gradient(70%_60%_at_30%_0%,rgba(99,102,241,0.38)_0%,transparent_70%)]"
@@ -69,7 +69,7 @@ export function AuthShell({
           <h2 className="mt-8 text-3xl font-semibold leading-tight tracking-tight text-white">
             Scheduling, payments and reminders in one link.
           </h2>
-          <p className="mt-4 text-base leading-relaxed text-neutral-300">
+          <p className="mt-4 text-base leading-relaxed text-slate-300">
             Sign in to manage your booking page, your availability and everyone who has booked time with you.
           </p>
 
@@ -79,7 +79,7 @@ export function AuthShell({
                 <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/10 text-brand-200">
                   <Icon className="h-4 w-4" />
                 </span>
-                <span className="text-sm leading-relaxed text-neutral-300">{text}</span>
+                <span className="text-sm leading-relaxed text-slate-300">{text}</span>
               </li>
             ))}
           </ul>

@@ -92,7 +92,7 @@ export function BookingPreview() {
       <div className="absolute -bottom-5 -left-4 hidden w-60 rounded-xl border border-border bg-surface p-3 shadow-lg sm:block lg:-left-10">
         <div className="flex items-start gap-2.5">
           <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-success-100">
-            <Video className="h-3.5 w-3.5 text-emerald-600" />
+            <Video className="h-3.5 w-3.5 text-success-600" />
           </span>
           <div className="min-w-0">
             <p className="text-xs font-semibold text-neutral-900">Google Meet created</p>

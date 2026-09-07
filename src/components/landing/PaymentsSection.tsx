@@ -25,7 +25,7 @@ export function PaymentsSection() {
               {POINTS.map((point) => (
                 <li key={point} className="flex items-start gap-3">
                   <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-success-100">
-                    <Check className="h-3 w-3 text-emerald-600" strokeWidth={3} />
+                    <Check className="h-3 w-3 text-success-600" strokeWidth={3} />
                   </span>
                   <span className="text-sm leading-relaxed text-neutral-600">{point}</span>
                 </li>
@@ -49,7 +49,7 @@ export function PaymentsSection() {
                   <span>Discovery call</span>
                   <span>₹499</span>
                 </div>
-                <div className="flex justify-between text-emerald-700">
+                <div className="flex justify-between text-success-700">
                   <span className="inline-flex items-center gap-1.5">
                     <Tag className="h-3.5 w-3.5" />
                     LAUNCH20

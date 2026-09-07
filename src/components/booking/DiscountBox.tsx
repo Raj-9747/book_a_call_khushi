@@ -54,10 +54,10 @@ export function DiscountBox({
 
   if (applied) {
     return (
-      <div className="flex items-center justify-between rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2.5">
+      <div className="flex items-center justify-between rounded-lg border border-success-200 bg-success-50 px-3 py-2.5">
         <div className="flex min-w-0 items-center gap-2">
-          <Tag className="h-4 w-4 shrink-0 text-emerald-600" />
-          <p className="truncate text-sm text-emerald-800">
+          <Tag className="h-4 w-4 shrink-0 text-success-600" />
+          <p className="truncate text-sm text-success-700">
             <span className="font-semibold">{applied.code}</span> applied — {applied.percent}% off
           </p>
         </div>
@@ -65,7 +65,7 @@ export function DiscountBox({
           type="button"
           onClick={onRemove}
           aria-label="Remove discount code"
-          className="shrink-0 rounded p-1 text-emerald-700 transition-colors hover:bg-emerald-100"
+          className="shrink-0 rounded p-1 text-success-700 transition-colors hover:bg-success-100"
         >
           <X className="h-4 w-4" />
         </button>

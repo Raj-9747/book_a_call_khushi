@@ -94,7 +94,7 @@ export function AdminsTable({
               <td className="px-6 py-3.5 text-neutral-600">/book/{admin.slug}</td>
               <td className="px-6 py-3.5">
                 {admin.google_calendar_connected ? (
-                  <span className="inline-flex items-center gap-1.5 text-emerald-600">
+                  <span className="inline-flex items-center gap-1.5 text-success-600">
                     <CalendarCheck2 className="h-4 w-4" /> Connected
                   </span>
                 ) : (

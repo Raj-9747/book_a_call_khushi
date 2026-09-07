@@ -16,21 +16,31 @@ export default async function DashboardProfilePage() {
   return (
     <>
       <PageHeader title="Profile" description="Your public page, account details and integrations" />
-      <div className="max-w-2xl space-y-6 p-4 sm:p-8">
-        <PublicLinkCard admin={admin} />
-        <PublicProfileForm admin={admin} />
-        <BookingToggleCard admin={admin} />
-        <ProfileForm admin={admin} />
-        <Card>
-          <CardHeader>
-            <CardTitle>Google Calendar</CardTitle>
-            <CardDescription>Used to check for conflicts before showing a slot as available.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <GoogleCalendarConnect connected={admin.google_calendar_connected} />
-          </CardContent>
-        </Card>
-        <ChangePasswordForm />
+      {/* Split into "what clients see" (left) and "your account" (right)
+          from xl up — six stacked cards in a single narrow column meant a
+          lot of scrolling past a lot of empty space. */}
+      <div className="mx-auto max-w-7xl p-4 sm:p-8">
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+          <div className="space-y-6">
+            <PublicLinkCard admin={admin} />
+            <PublicProfileForm admin={admin} />
+          </div>
+
+          <div className="space-y-6">
+            <BookingToggleCard admin={admin} />
+            <ProfileForm admin={admin} />
+            <Card>
+              <CardHeader>
+                <CardTitle>Google Calendar</CardTitle>
+                <CardDescription>Used to check for conflicts before showing a slot as available.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <GoogleCalendarConnect connected={admin.google_calendar_connected} />
+              </CardContent>
+            </Card>
+            <ChangePasswordForm />
+          </div>
+        </div>
       </div>
     </>
   );

@@ -92,7 +92,7 @@ export function ActionsMenu({ items, disabled }: { items: ActionsMenuItem[]; dis
                   }}
                   className={cn(
                     "flex w-full items-center gap-1.5 px-3 py-2 text-left text-sm disabled:opacity-50",
-                    item.tone === "danger" ? "text-danger-500 hover:bg-red-50" : "text-neutral-700 hover:bg-neutral-50"
+                    item.tone === "danger" ? "text-danger-500 hover:bg-danger-50" : "text-neutral-700 hover:bg-neutral-50"
                   )}
                 >
                   {Icon && <Icon className="h-3.5 w-3.5" />}

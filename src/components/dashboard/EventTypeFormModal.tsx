@@ -93,7 +93,7 @@ function QuestionRow({
           )}
           {questionErrors?.label && <p className="text-xs text-danger-500">{questionErrors.label.message}</p>}
         </div>
-        <button type="button" onClick={onRemove} className="rounded-md p-1.5 text-neutral-400 hover:bg-red-50 hover:text-danger-500">
+        <button type="button" onClick={onRemove} className="rounded-md p-1.5 text-neutral-400 hover:bg-danger-50 hover:text-danger-500">
           <Trash2 className="h-4 w-4" />
         </button>
       </div>

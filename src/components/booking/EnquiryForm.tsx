@@ -70,7 +70,7 @@ export function EnquiryForm({
   if (submitted) {
     return (
       <div className="rounded-xl border border-border bg-surface p-6 text-center sm:p-8">
-        <CheckCircle2 className="mx-auto h-10 w-10 text-emerald-600" />
+        <CheckCircle2 className="mx-auto h-10 w-10 text-success-600" />
         <h2 className="mt-3 text-base font-semibold text-neutral-900">Thanks — we&apos;ve got your details</h2>
         <p className="mt-1 text-sm text-neutral-500">
           {adminName} will reach out to you directly once they&apos;re taking bookings again.
@@ -82,7 +82,7 @@ export function EnquiryForm({
   return (
     <div className="rounded-xl border border-border bg-surface">
       <div className="flex items-start gap-3 border-b border-border px-5 py-4 sm:px-6">
-        <CalendarOff className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
+        <CalendarOff className="mt-0.5 h-5 w-5 shrink-0 text-warning-600" />
         <div>
           <h2 className="text-sm font-semibold text-neutral-900">Currently unavailable</h2>
           <p className="mt-1 text-sm text-neutral-500">

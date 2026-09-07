@@ -37,7 +37,7 @@ export function GoogleCalendarConnect({ connected }: { connected: boolean }) {
   if (connected) {
     return (
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <span className="inline-flex items-center gap-1.5 text-sm font-medium text-emerald-600">
+        <span className="inline-flex items-center gap-1.5 text-sm font-medium text-success-600">
           <CalendarCheck2 className="h-4 w-4" /> Google Calendar connected
         </span>
         <Button variant="outline" size="sm" isLoading={disconnecting} onClick={handleDisconnect}>

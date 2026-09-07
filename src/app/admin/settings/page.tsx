@@ -11,9 +11,11 @@ export default async function AdminSettingsPage() {
   return (
     <>
       <PageHeader title="Settings" description="Manage your account" />
-      <div className="max-w-lg space-y-6 p-4 sm:p-8">
-        <ProfileForm admin={admin} />
-        <ChangePasswordForm />
+      <div className="mx-auto max-w-5xl p-4 sm:p-8">
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+          <ProfileForm admin={admin} />
+          <ChangePasswordForm />
+        </div>
       </div>
     </>
   );

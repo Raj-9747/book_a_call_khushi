@@ -122,7 +122,7 @@ export default async function ManageBookingPage({ params }: { params: Promise<{ 
             )}
 
             {isCancelled && (
-              <p className="rounded-lg border border-danger-500/20 bg-danger-100/50 px-4 py-3 text-sm text-red-700">
+              <p className="rounded-lg border border-danger-500/20 bg-danger-100/50 px-4 py-3 text-sm text-danger-700">
                 This booking was cancelled. If that wasn&apos;t expected, reply to your confirmation email.
               </p>
             )}

@@ -289,7 +289,7 @@ export function BookingsManager({ adminId }: { adminId: string }) {
                                   ₹{booking.amount_due.toLocaleString("en-IN")}
                                 </span>
                                 {booking.discount_percent && (
-                                  <span className="ml-1.5 text-xs text-emerald-700">
+                                  <span className="ml-1.5 text-xs text-success-700">
                                     −{booking.discount_percent}%
                                   </span>
                                 )}

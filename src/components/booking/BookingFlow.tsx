@@ -279,7 +279,7 @@ export function BookingFlow({ admin, eventType }: { admin: PublicAdmin; eventTyp
                 <span>{formatAmount(eventType.price)}</span>
               </div>
               {discount && (
-                <div className="flex justify-between text-emerald-700">
+                <div className="flex justify-between text-success-700">
                   <span>{discount.code}</span>
                   <span>−{formatAmount(eventType.price - total)}</span>
                 </div>

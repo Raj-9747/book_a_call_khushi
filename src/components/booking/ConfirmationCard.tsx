@@ -19,7 +19,7 @@ export function ConfirmationCard({
   return (
     <Card className="text-center">
       <CardContent className="flex flex-col items-center py-10">
-        <CheckCircle2 className="h-12 w-12 text-emerald-500" />
+        <CheckCircle2 className="h-12 w-12 text-success-500" />
         <h2 className="mt-4 text-lg font-semibold text-neutral-900">You&apos;re booked!</h2>
         <p className="mt-1 text-sm text-neutral-500">
           {eventType.name} with {admin.name}

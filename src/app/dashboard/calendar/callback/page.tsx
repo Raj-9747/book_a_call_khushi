@@ -68,7 +68,7 @@ function GoogleCalendarCallbackContent() {
         )}
         {state === "success" && (
           <>
-            <CheckCircle2 className="h-10 w-10 text-emerald-500" />
+            <CheckCircle2 className="h-10 w-10 text-success-500" />
             <p className="mt-4 text-sm font-medium text-neutral-900">Google Calendar connected!</p>
             <p className="mt-1 text-sm text-neutral-500">Redirecting you back...</p>
           </>

@@ -1,5 +1,10 @@
 @import "tailwindcss";
 
+/* Class-based dark mode. `dark` goes on <html>, so portal-rendered UI
+   (modals, dropdowns, date pickers — all of which render into document.body
+   and would otherwise escape a wrapper element) themes correctly too. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
   /* Base surface & text */
   --background: #ffffff;
@@ -29,19 +34,39 @@
   --brand-800: #3730a3;
   --brand-900: #312e81;
 
-  /* Semantic */
-  --success-500: #10b981;
+  /* Semantic accents. The -100 tints are backgrounds, the -600/-700 shades
+     are the text/icon colors that sit on them — both flip in dark mode, so
+     always use these rather than raw emerald/red/amber utilities, which
+     don't theme. */
+  --success-50: #ecfdf5;
   --success-100: #d1fae5;
-  --warning-500: #f59e0b;
+  --success-200: #a7f3d0;
+  --success-500: #10b981;
+  --success-600: #059669;
+  --success-700: #047857;
+
   --warning-100: #fef3c7;
-  --danger-500: #ef4444;
+  --warning-500: #f59e0b;
+  --warning-600: #d97706;
+  --warning-700: #b45309;
+
+  --danger-50: #fef2f2;
   --danger-100: #fee2e2;
+  --danger-500: #ef4444;
+  --danger-600: #dc2626;
+  --danger-700: #b91c1c;
 
   /* Surfaces & borders */
   --surface: #ffffff;
   --surface-muted: var(--neutral-50);
   --border: var(--neutral-200);
   --border-strong: var(--neutral-300);
+
+  /* App chrome — the sidebar is deliberately a different tone from the
+     content area so the two read as separate regions rather than one
+     undifferentiated white field. */
+  --sidebar: #f1f5f9;
+  --sidebar-border: #e2e8f0;
 
   /* Radius scale */
   --radius-sm: 6px;
@@ -54,6 +79,82 @@
   --shadow-sm: 0 1px 3px 0 rgb(15 23 42 / 0.06), 0 1px 2px -1px rgb(15 23 42 / 0.04);
   --shadow-md: 0 4px 12px -2px rgb(15 23 42 / 0.08), 0 2px 4px -2px rgb(15 23 42 / 0.04);
   --shadow-lg: 0 12px 24px -6px rgb(15 23 42 / 0.10), 0 4px 8px -4px rgb(15 23 42 / 0.06);
+}
+
+/* ==========================================================================
+   Dark theme
+   --------------------------------------------------------------------------
+   Implemented by re-pointing the same design tokens rather than sprinkling
+   `dark:` utilities through every component — so anything already built on
+   the token system (bg-surface, text-neutral-900, border-border, …) adapts
+   with no per-component work.
+
+   Note the neutral scale INVERTS here: `text-neutral-900` is the primary
+   text colour, so in dark mode it has to resolve to a light value. The
+   consequence is that `bg-neutral-900` also becomes light — so anywhere a
+   surface must stay dark in BOTH themes (modal backdrops, the marketing
+   CTA panel, the sign-in brand panel) uses raw `slate-*` utilities, which
+   are outside this token system and therefore don't flip.
+   ========================================================================== */
+.dark {
+  color-scheme: dark;
+
+  --background: #0b0f17;
+  --foreground: #e6edf6;
+
+  --neutral-50: #161d2b;
+  --neutral-100: #1c2434;
+  --neutral-200: #263041;
+  --neutral-300: #33405a;
+  --neutral-400: #64748b;
+  --neutral-500: #94a3b8;
+  --neutral-600: #b6c2d4;
+  --neutral-700: #cbd5e1;
+  --neutral-800: #e2e8f0;
+  --neutral-900: #f1f5f9;
+
+  --brand-50: #1e1b4b;
+  --brand-100: #312e81;
+  --brand-200: #3730a3;
+  --brand-300: #4338ca;
+  --brand-400: #6366f1;
+  --brand-500: #6366f1;
+  --brand-600: #6366f1;
+  --brand-700: #818cf8;
+  --brand-800: #a5b4fc;
+  --brand-900: #c7d2fe;
+
+  --success-50: #052e20;
+  --success-100: #063d2a;
+  --success-200: #10603f;
+  --success-500: #10b981;
+  --success-600: #34d399;
+  --success-700: #6ee7b7;
+
+  --warning-100: #3a2a06;
+  --warning-500: #f59e0b;
+  --warning-600: #fbbf24;
+  --warning-700: #fcd34d;
+
+  --danger-50: #3a1418;
+  --danger-100: #4a1418;
+  --danger-500: #ef4444;
+  --danger-600: #f87171;
+  --danger-700: #fca5a5;
+
+  --surface: #111827;
+  --surface-muted: #0b0f17;
+  --border: #263041;
+  --border-strong: #33405a;
+
+  --sidebar: #0e1522;
+  --sidebar-border: #1e2637;
+
+  /* Shadows need more opacity to read at all against dark surfaces. */
+  --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.30);
+  --shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.36), 0 1px 2px -1px rgb(0 0 0 / 0.30);
+  --shadow-md: 0 4px 12px -2px rgb(0 0 0 / 0.44), 0 2px 4px -2px rgb(0 0 0 / 0.34);
+  --shadow-lg: 0 12px 24px -6px rgb(0 0 0 / 0.52), 0 4px 8px -4px rgb(0 0 0 / 0.40);
 }
 
 @theme inline {
@@ -82,17 +183,30 @@
   --color-brand-800: var(--brand-800);
   --color-brand-900: var(--brand-900);
 
+  --color-success-50: var(--success-50);
   --color-success-100: var(--success-100);
+  --color-success-200: var(--success-200);
   --color-success-500: var(--success-500);
+  --color-success-600: var(--success-600);
+  --color-success-700: var(--success-700);
+
   --color-warning-100: var(--warning-100);
   --color-warning-500: var(--warning-500);
+  --color-warning-600: var(--warning-600);
+  --color-warning-700: var(--warning-700);
+
+  --color-danger-50: var(--danger-50);
   --color-danger-100: var(--danger-100);
   --color-danger-500: var(--danger-500);
+  --color-danger-600: var(--danger-600);
+  --color-danger-700: var(--danger-700);
 
   --color-surface: var(--surface);
   --color-surface-muted: var(--surface-muted);
   --color-border: var(--border);
   --color-border-strong: var(--border-strong);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-border: var(--sidebar-border);
 
   --radius-sm: var(--radius-sm);
   --radius-md: var(--radius-md);
