@@ -535,5 +535,148 @@ Fixed: Vercel function region colocated with Supabase (Tokyo) — compute was in
 ## 10.8 Still open
 
 - The two items flagged in §9.12 remain unaddressed: admins can write arbitrary values to their own `bookings` rows, and `approveReschedule` doesn't check live `pending_payment` holds or Google Calendar before approving.
-- WhatsApp/Zaple notifications are still not built — email only.
+- ~~WhatsApp/Zaple notifications are still not built — email only.~~ **Corrected 8 Sep:** Zaple *is* wired, for one message only — the admin's "new booking" alert (the `HTTP Request3` node in `create-booking-event.json`). Clients still get email only. Phase 12 (§11) fills the rest in.
 - Payment-page view tracking / conversion rate ("120 viewed, 8 booked") would need new view logging on `/book/*`; deliberately not added.
+
+---
+
+## 11. Phase 12 — Meeting intelligence, MoM delivery and payment recovery
+
+Three additions, requested 10 Sep:
+
+1. **Fireflies on every recorded meeting**, with the summary stored against that booking on the admin side
+2. **MoM (minutes of meeting) delivered to both the admin and the client** after the call
+3. **Abandoned-payment reminder** — someone who reached checkout and let the hold lapse gets nudged back
+
+All notifications reuse the existing Gmail + Zaple pipeline in n8n.
+
+## 11.1 Where WhatsApp actually stands
+
+Worth stating plainly, because §9.12 and §10.8 both said WhatsApp "was never built" and that stopped being true on 8 Sep:
+
+| Recipient | Event | Email | WhatsApp |
+|---|---|---|---|
+| Admin | New booking | — | **Built** — `HTTP Request3` in `create-booking-event.json` |
+| Client | Booking confirmed | Built (Gmail) | **Not planned** — email is enough |
+| Client | 1 hour before | Built (Gmail) | **Not planned** — email is enough |
+| Client | MoM ready | Phase 12 | Phase 12 |
+| Admin | MoM ready | Phase 12 | Phase 12 |
+| Client | Payment not completed | Phase 12 | Phase 12 |
+
+The one built node is the template for all of them:
+
+```
+POST https://app.zaple.ai/api/v2/send-template-message
+  template_id, country_code, send_to, template_argument1..N
+```
+
+`template_argumentN` maps to `{{N}}` in the approved Meta template.
+
+**Phone formats differ between the two sides and this is a real trap.** `admins.phone` is a bare 10-digit string and the node hardcodes `country_code: "91"`. `bookings.client_phone` is **E.164** (`+919876543210`) since the Phase 11 country-code work. Zaple needs the dial code and the national number as separate fields, so the client's number has to be split back apart — by **longest-prefix match against `COUNTRY_CODES`**, never a fixed-length slice, since dial codes run 1–4 digits (`+1`, `+91`, `+971`, `+1264`). The split belongs in `relay-booking-to-n8n` and the new reminder RPC, so no n8n expression ever has to do it.
+
+## 11.2 Confirmed decisions (this phase)
+
+| Area | Decision |
+|---|---|
+| WhatsApp scope | **Three new messages only**: client MoM, admin MoM, client payment-not-completed. Booking confirmation and the 1-hour reminder stay email-only — they already work, and a WhatsApp duplicate of an email the client just received is noise rather than reach. |
+| Fireflies account | **One company account.** A single API key + webhook secret held as Edge Function secrets, not per-admin credentials. Deliberately breaks the §2 no-hardcoding principle for this one integration: per-admin would mean every admin buying their own Fireflies seat, and the value here is a company-wide meeting record. Watch the seat's **concurrent-bot limit** — two admins in calls at the same time may need a second seat. |
+| How the bot joins | **Invited as a calendar attendee** (`fred@fireflies.ai`) on the event n8n already creates. We decide per meeting what gets recorded, and no admin has to configure anything inside Fireflies. The alternative — each admin linking their calendar to Fireflies — would also record their non-Zaptly meetings and give us no per-event control. |
+| What gets recorded | **Per event type**, via a `record_meeting` toggle. A paid strategy call is worth recording; a free 15-minute intro probably isn't. |
+| Client consent | When `record_meeting` is on, the public event page states it before booking, and the confirmation email repeats it. A recording bot appearing unannounced in someone's call is the thing to avoid; saying "you'll get the notes afterwards" also turns it into a benefit. |
+| MoM delivery | **Auto-sent to both** as soon as Fireflies finishes — no admin approval step. |
+| MoM content split | The client gets **short summary + action items only**. The admin gets that plus the full overview, keywords and the transcript link. See the risk note in §11.6. |
+| Canonical MoM home | The **existing magic-link page** `/booking/[token]`. Email and WhatsApp both point at it. |
+| MoM over WhatsApp | Short "your notes are ready" template + the magic link. **A MoM cannot go in a WhatsApp template** — Meta rejects newlines, tabs and 4+ consecutive spaces inside variable values, and caps the body near 1024 characters. |
+| MoM over email | Full text inline (email has neither limit) plus the same link. |
+| Abandoned reminder timing | **One reminder, ~15 minutes after the hold expires** (so ~25 minutes after they started). Sending on expiry risks landing while they're actively retrying; a second reminder is spam aimed at someone who already declined. |
+| Abandoned reminder honesty | The hold is released at expiry, so the slot is genuinely gone. The message must **not** say "your slot is reserved" — it sends them back to the event page to pick a time again. |
+| Suppression | No reminder if that email already has a `confirmed` booking for the same event type created after the expired one — they retried and succeeded, and telling them otherwise is worse than silence. |
+
+## 11.3 Data model changes
+
+### Migration `0019_meeting_summaries.sql`
+
+- `event_types.record_meeting boolean not null default false`
+- `bookings.meet_link` gets an index — it's the join key from Fireflies back to a booking
+- New table `meeting_summaries`:
+
+| Column | Notes |
+|---|---|
+| `id` | uuid pk |
+| `booking_id` | fk → bookings, **unique** — one summary per booking |
+| `admin_id` | fk → admins; denormalised so RLS is a plain `admin_id = current_admin_id()` like every other table |
+| `fireflies_meeting_id` | text, **unique** — the idempotency key; Fireflies can retry a webhook |
+| `title`, `short_summary`, `overview` | text |
+| `action_items`, `keywords` | jsonb arrays |
+| `transcript_url`, `duration_minutes` | admin-only fields |
+| `raw` | jsonb — the whole Fireflies payload, so a later change of mind about which fields matter needs no re-fetch |
+| `mom_sent_at` | timestamptz null |
+| `created_at` | |
+
+RLS: admins `select` their own rows. **No client-side insert or update at all** — the row is written by the Edge Function under the service role, so an admin can't fabricate or edit a meeting record.
+
+### Migration `0020_abandoned_payment_reminders.sql`
+
+- `bookings.abandoned_reminder_sent boolean not null default false`
+- Partial index on `(status, abandoned_reminder_sent)` where `status = 'expired'`
+- `get_abandoned_bookings(p_min_age_minutes int)` — service-role only. Returns expired unpaid bookings older than the cutoff, already joined to admin name/slug, event-type name/slug and a pre-split `client_phone_country_code` / `client_phone_national`, and already filtered by the retry-suppression rule in §11.2. That `NOT EXISTS` check is why this is an RPC and not a PostgREST query from n8n.
+- `mark_abandoned_reminder_sent(p_booking_id uuid)`
+
+## 11.4 Fireflies flow
+
+1. Booking confirmed → `relay-booking-to-n8n` fires as it does today, now also passing `event_type.record_meeting` and the split client phone.
+2. n8n's Google Calendar node appends `fred@fireflies.ai` to `attendees` **only when `record_meeting` is true**. The bot joins from the calendar invite.
+3. Call happens. Fireflies transcribes and summarises.
+4. Fireflies fires its `Transcription completed` webhook at a new Edge Function, **`fireflies-webhook`**:
+   - Verifies the `x-hub-signature` HMAC-SHA256 over the **raw body** — same pattern as `razorpay-webhook`, and for the same reason: re-serialising parsed JSON changes the bytes and breaks the signature.
+   - Fetches the transcript from `https://api.fireflies.ai/graphql` (`summary { short_summary overview action_items keywords }`, `meeting_link`, `duration`, `transcript_url`).
+   - **Matches `meeting_link` against `bookings.meet_link`**, normalised — lowercased, query string and trailing slash stripped. Matching on title or time would be guesswork; the Meet URL is exact.
+   - No match → return 200 with `{skipped}`. Someone may have invited the bot to a non-Zaptly meeting; that is not an error and must not retry forever.
+   - Upserts `meeting_summaries` on `fireflies_meeting_id`.
+   - Posts to a new n8n webhook to send the MoM.
+5. n8n `mom-ready` workflow sends four messages: email + WhatsApp to the admin, email + WhatsApp to the client.
+6. `/booking/[token]` renders the client's MoM. `/dashboard/bookings` → booking detail renders the admin's fuller version.
+
+**Why the webhook, not polling.** Fireflies takes minutes to finish and the wait varies with call length. A cron would either poll constantly or add lag; the webhook fires exactly once when the transcript is actually ready.
+
+## 11.5 Abandoned-payment flow
+
+`expire_pending_bookings()` already flips the status to `expired` every 5 minutes and refunds the discount-code use (§9.12). This hangs off that existing sweep rather than adding a second notion of "abandoned":
+
+1. New n8n cron, every 10 minutes → `get_abandoned_bookings(15)`.
+2. Split → send email + WhatsApp → `mark_abandoned_reminder_sent`.
+3. Link goes to `/book/{admin_slug}/{event_slug}` — the event page, not a dead held slot.
+
+**WhatsApp category.** All three templates were created and approved as **Utility**, the payment-recovery one included — it follows from a checkout the client themselves started, so it reads as transactional rather than promotional. That removes the opt-in requirement and the mandatory opt-out line that a Marketing classification would have forced, and means no consent checkbox is needed on the booking form. Worth knowing that Meta re-reviews template categories and can reclassify one after the fact; if that happens to the payment template it stops sending and falls back to email, without touching the two MoM templates.
+
+## 11.6 Risk accepted: auto-sending the MoM
+
+Auto-send to both was chosen over admin review. The real exposure is that an AI summary of a **sales** call can contain pricing strategy, an aside made before the client joined, or a mischaracterisation — and it reaches the client with nobody having read it.
+
+Three things blunt it, none of which add an approval step:
+
+- The client's copy is built from **`short_summary` + `action_items` only** — never `overview`, never the transcript link. Those are the fields most likely to carry stray context.
+- `record_meeting` is **per event type and defaults off**, so a sales call can simply not be recorded.
+- The client's MoM lives on `/booking/[token]`, so if something does go out wrong there's one place to correct it.
+
+If this bites in practice, the smallest fix is a delay — hold the client's copy for 30 minutes, send the admin's immediately, and put a "don't send" button on the booking. Not building that now.
+
+## 11.7 Files to add / change
+
+**New:** `0019_meeting_summaries.sql`, `0020_abandoned_payment_reminders.sql`, `supabase/functions/fireflies-webhook/`, `n8n/workflows/mom-ready.json`, `n8n/workflows/abandoned-payment-cron.json`, a MoM block on `/booking/[token]`, a MoM panel in the booking detail view.
+
+**Changed:** `relay-booking-to-n8n` (add `record_meeting`, split client phone), `create-booking-event.json` (Fireflies attendee; also rename `HTTP Request3` to something legible), `EventTypeFormModal` (`record_meeting` toggle), the public event page (recording notice). `reminder-cron.json` is untouched — the 1-hour reminder stays email-only.
+
+## 11.8 What you'll need to provide
+
+- Fireflies **paid plan with API access**, its API key, and a webhook secret
+- ~~Approved Zaple/Meta templates~~ — done, all three approved as Utility:
+  - Client MoM ready — `188758117891098742496888`
+  - Admin MoM ready — `126497717891099281990193`
+  - Client payment not completed — `272563817891100082631965`
+- Confirmation of the Fireflies notetaker address — `fred@fireflies.ai` at time of writing, worth re-checking against their current docs
+
+## 11.9 Open
+
+- Fireflies seat concurrency if two admins run calls simultaneously
+- Whether a client should be able to opt out of the recording at booking time, or only the admin decides per event type
