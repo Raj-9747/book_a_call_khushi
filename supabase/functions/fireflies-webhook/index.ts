@@ -184,7 +184,13 @@ Deno.serve(async (req) => {
 
   const meetingId = event.meetingId;
   if (!meetingId) {
-    return jsonResponse({ error: "No meetingId in payload" }, 400);
+    // A real "no meetingId" delivery would be a genuine problem, but this
+    // is also exactly the shape of Fireflies' own "Test Webhook" ping
+    // (an empty/minimal body sent purely to confirm the URL is reachable)
+    // — a 4xx there reads as "webhook broken" in their dashboard when
+    // nothing actually is. 200+skipped, same as every other "nothing to
+    // do here" case in this function, not an error.
+    return jsonResponse({ skipped: "no meetingId in payload — likely a connectivity test" });
   }
 
   const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
