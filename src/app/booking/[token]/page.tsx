@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { formatInTimeZone } from "date-fns-tz";
-import { CalendarDays, Clock, Video } from "lucide-react";
+import { CalendarDays, Clock, Sparkles, Video } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { Avatar, Badge } from "@/components/ui";
 import { getBookingByToken } from "@/lib/api/manageBooking";
@@ -120,6 +120,25 @@ export default async function ManageBookingPage({ params }: { params: Promise<{ 
                 <p className="mt-1.5 whitespace-pre-line text-sm leading-relaxed text-neutral-700">
                   {booking.event_description}
                 </p>
+              </div>
+            )}
+
+            {booking.mom_short_summary && (
+              <div className="rounded-lg border border-brand-200 bg-brand-50 px-4 py-3.5">
+                <p className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-brand-700">
+                  <Sparkles className="h-3.5 w-3.5" />
+                  Meeting notes
+                </p>
+                <p className="mt-1.5 whitespace-pre-line text-sm leading-relaxed text-brand-900">
+                  {booking.mom_short_summary}
+                </p>
+                {booking.mom_action_items.length > 0 && (
+                  <ul className="mt-2.5 list-disc space-y-1 pl-4 text-sm text-brand-900">
+                    {booking.mom_action_items.map((item, i) => (
+                      <li key={i}>{item}</li>
+                    ))}
+                  </ul>
+                )}
               </div>
             )}
 

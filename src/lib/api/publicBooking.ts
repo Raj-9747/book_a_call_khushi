@@ -39,6 +39,7 @@ export interface PublicEventType {
   duration_minutes: number;
   price: number;
   description: string | null;
+  record_meeting: boolean;
   custom_questions: {
     id: string;
     label: string;

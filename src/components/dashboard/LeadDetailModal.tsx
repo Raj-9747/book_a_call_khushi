@@ -1,11 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { formatInTimeZone } from "date-fns-tz";
+import { FileText, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { Modal, Badge, Button, FormField, Select, Textarea } from "@/components/ui";
 import { updateBookingLeadInfo } from "@/lib/api/bookings";
 import type { BookingWithEventType } from "@/lib/api/bookings";
+import { getMeetingSummary, type MeetingSummary } from "@/lib/api/meetingSummaries";
 import type { LeadTag } from "@/types/models";
 
 const IST = "Asia/Kolkata";
@@ -29,6 +31,31 @@ export function LeadDetailModal({
   const [notes, setNotes] = useState(booking?.notes ?? "");
   const [tag, setTag] = useState<string>(booking?.tag ?? "");
   const [saving, setSaving] = useState(false);
+  // undefined = still loading, null = loaded but nothing there yet.
+  const [summary, setSummary] = useState<MeetingSummary | null | undefined>(undefined);
+
+  // The parent keys this modal with `key={selected?.id}` (LeadDetailModal
+  // never unmounts otherwise — see PLAN.md §10.6), so a plain effect here
+  // is safe: it re-runs on mount per booking rather than needing to guard
+  // against stale state from a previous one.
+  useEffect(() => {
+    if (!booking?.event_types?.record_meeting) return;
+    let cancelled = false;
+    getMeetingSummary(booking.id)
+      .then((result) => {
+        if (!cancelled) setSummary(result);
+      })
+      .catch(() => {
+        // Non-fatal — the rest of the modal is still useful without it.
+        // Falls back to the "still loading" copy rather than a false
+        // "not available yet", but that's an acceptable trade for a
+        // network hiccup on a secondary panel.
+      });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [booking?.id]);
 
   if (!booking) return null;
 
@@ -86,6 +113,44 @@ export function LeadDetailModal({
                 <p className="text-neutral-900">{answer}</p>
               </div>
             ))}
+          </div>
+        )}
+
+        {booking.event_types?.record_meeting && (
+          <div className="space-y-2.5 border-t border-border pt-3">
+            <p className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-neutral-500">
+              <Sparkles className="h-3.5 w-3.5" />
+              Meeting notes
+            </p>
+            {summary === undefined ? (
+              <p className="text-sm text-neutral-400">Loading…</p>
+            ) : summary ? (
+              <div className="space-y-2.5 rounded-lg bg-neutral-50 px-3.5 py-3 text-sm">
+                {summary.short_summary && <p className="text-neutral-800">{summary.short_summary}</p>}
+                {summary.action_items.length > 0 && (
+                  <ul className="list-disc space-y-1 pl-4 text-neutral-700">
+                    {summary.action_items.map((item, i) => (
+                      <li key={i}>{item}</li>
+                    ))}
+                  </ul>
+                )}
+                {summary.transcript_url && (
+                  <a
+                    href={summary.transcript_url}
+                    target="_blank"
+                    rel="noreferrer noopener"
+                    className="inline-flex items-center gap-1.5 text-brand-600 hover:underline"
+                  >
+                    <FileText className="h-3.5 w-3.5" />
+                    View full transcript
+                  </a>
+                )}
+              </div>
+            ) : (
+              <p className="text-sm text-neutral-400">
+                Not available yet — notes appear here once the call ends and Fireflies finishes processing it.
+              </p>
+            )}
           </div>
         )}
 

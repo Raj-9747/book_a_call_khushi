@@ -14,6 +14,7 @@ export const eventTypeFormSchema = z
       .max(480, "Maximum 8 hours"),
     price: z.coerce.number({ error: "Enter a price" }).min(0, "Price can't be negative"),
     description: z.string().max(500, "Keep it under 500 characters").optional(),
+    record_meeting: z.boolean(),
     custom_questions: z
       .array(
         z.object({

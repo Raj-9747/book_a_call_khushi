@@ -29,6 +29,7 @@
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { corsHeaders, jsonResponse } from "../_shared/cors.ts";
 import { refreshGoogleAccessToken } from "../_shared/google.ts";
+import { splitE164Phone } from "../_shared/phoneSplit.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -111,7 +112,7 @@ Deno.serve(async (req) => {
 
   const { data: eventType } = await supabase
     .from("event_types")
-    .select("name, duration_minutes")
+    .select("name, duration_minutes, record_meeting")
     .eq("id", booking.event_type_id)
     .maybeSingle();
 
@@ -119,6 +120,12 @@ Deno.serve(async (req) => {
   if (admin?.google_calendar_connected && admin.google_refresh_token) {
     googleAccessToken = await refreshGoogleAccessToken(admin.google_refresh_token);
   }
+
+  // Zaple wants the dial code and national number as separate fields —
+  // client_phone is E.164, unlike the admin's bare 10-digit number sent
+  // below. Null when the number doesn't match a recognized dial code; n8n
+  // gates the WhatsApp send on that and still sends email regardless.
+  const clientPhoneSplit = splitE164Phone(booking.client_phone);
 
   const n8nResponse = await fetch(N8N_BOOKING_WEBHOOK_URL, {
     method: "POST",
@@ -136,6 +143,8 @@ Deno.serve(async (req) => {
         client_name: booking.client_name,
         client_email: booking.client_email,
         client_phone: booking.client_phone,
+        client_phone_country_code: clientPhoneSplit?.countryCode ?? null,
+        client_phone_national: clientPhoneSplit?.national ?? null,
         client_timezone: booking.client_timezone,
         custom_answers: booking.custom_answers,
         // Where the client manages this booking (view details, request a
@@ -146,7 +155,9 @@ Deno.serve(async (req) => {
         payment_status: booking.payment_status,
       },
       admin: admin ? { id: admin.id, name: admin.name, email: admin.email, phone: admin.phone, timezone: admin.timezone } : null,
-      event_type: eventType ? { name: eventType.name, duration_minutes: eventType.duration_minutes } : null,
+      event_type: eventType
+        ? { name: eventType.name, duration_minutes: eventType.duration_minutes, record_meeting: eventType.record_meeting }
+        : null,
       google_access_token: googleAccessToken,
     }),
   });

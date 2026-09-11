@@ -75,6 +75,7 @@ export async function createEventType(adminId: string, input: EventTypeFormValue
       duration_minutes: input.duration_minutes,
       price: input.price,
       description: input.description || null,
+      record_meeting: input.record_meeting,
       custom_questions: toCustomQuestions(input.custom_questions),
     })
     .select()
@@ -96,6 +97,7 @@ export async function updateEventType(id: string, input: EventTypeFormValues): P
       duration_minutes: input.duration_minutes,
       price: input.price,
       description: input.description || null,
+      record_meeting: input.record_meeting,
       custom_questions: toCustomQuestions(input.custom_questions),
     })
     .eq("id", id)

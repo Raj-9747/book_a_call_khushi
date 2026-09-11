@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { formatInTimeZone } from "date-fns-tz";
-import { CalendarDays, Clock } from "lucide-react";
+import { CalendarDays, Clock, Video } from "lucide-react";
 import { toast } from "sonner";
 import { Button, Card, CardContent, Modal, Spinner } from "@/components/ui";
 import { computeAvailableSlots } from "@/lib/availability/computeSlots";
@@ -216,6 +216,15 @@ export function BookingFlow({ admin, eventType }: { admin: PublicAdmin; eventTyp
               <p className="mt-1.5 whitespace-pre-line text-sm leading-relaxed text-neutral-700">
                 {eventType.description}
               </p>
+            </div>
+          )}
+
+          {/* Stated before booking, not discovered when a bot joins the
+              call — see PLAN.md §11.2 "Client consent". */}
+          {eventType.record_meeting && (
+            <div className="flex items-start gap-2 rounded-lg border border-brand-200 bg-brand-50 px-4 py-3 text-sm text-brand-800">
+              <Video className="mt-0.5 h-4 w-4 shrink-0" />
+              <p>This session is recorded and you&apos;ll get a summary of what was discussed afterwards.</p>
             </div>
           )}
 

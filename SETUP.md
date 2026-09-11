@@ -20,6 +20,12 @@ Things needed from your side to get the current build running and testable. Grow
   - `0012_payments_and_magic_link.sql` — Razorpay columns + the `manage_token` magic link, the `pending_payment`/`expired` statuses and the new `payment_status` vocabulary (existing `paid_dummy` rows are folded into `paid`), and the RPCs behind booking creation, payment confirmation and hold expiry. **`create_public_booking` is revoked from anonymous callers here** — the public page now goes through the `create-booking` Edge Function instead
   - `0013_booking_change_requests.sql` — the `booking_change_requests` table (reschedule/cancel requests from the magic-link page), its public submission RPC, and a `get_booking_by_token` that also returns the admin's availability data (so the magic link can offer a real slot picker when proposing a reschedule) and any existing request on that booking
   - `0014_security_hardening.sql` — closes two real gaps found in a full security audit: an admin could self-promote to `super_admin` via a direct table write (no column-level check existed on the self-update RLS policy), and a deactivated admin's existing session kept full data access since the ownership check didn't look at `is_active`. Also removes an unintended super-admin bypass on bookings/event types/blocked slots that contradicted this project's own "siloed even from super-admin" decision. **Also re-deploy `update-admin`** — it now handles the one legitimate `is_active` write that used to be a direct client-side table update
+  - `0015_admin_social_links.sql` — adds `x_url`/`website_url` to admins and re-creates `get_public_admin`/`get_booking_by_token` to return them. **Run this before deploying any frontend build that expects those columns** — skipping it makes `getCurrentAdmin()` fail silently and every admin gets bounced back to `/login`
+  - `0016_recurring_blocked_slots.sql` — adds `recurrence_group_id` to `blocked_slots` (for weekly/fortnightly/monthly repeating blocks) plus a `btree_gist` exclusion constraint that rejects an overlapping block outright rather than silently allowing it
+  - `0017_dashboard_overview.sql` — `get_dashboard_overview()`, the RPC behind the rebuilt Overview page (earnings, today's schedule, action items, top sessions)
+  - `0018_payment_summary.sql` — `get_payment_summary()`, the collected/refunded/net totals behind the Payments page
+  - `0019_meeting_summaries.sql` — adds `record_meeting` to event types, the `meeting_summaries` table Fireflies summaries land in, and re-creates `get_public_event_type`/`get_booking_by_token` to carry that flag and the client's copy of the MoM
+  - `0020_abandoned_payment_reminders.sql` — adds `abandoned_reminder_sent` to bookings, and the two RPCs (`get_abandoned_bookings`, `mark_abandoned_reminder_sent`) the new abandoned-payment-reminder n8n cron calls
 
 After running `0009`, confirm the bucket exists: Supabase Dashboard → Storage → you should see **`admin-photos`** (public, 2 MB limit, JPG/PNG/WebP only). The migration creates it, so there's nothing to click — this is just a check.
 
@@ -243,7 +249,21 @@ Not exhaustive — prioritized by "what would be most damaging if broken in a li
 74. **Delete an event type that already has bookings** — confirm it's refused with a clear message pointing at "deactivate instead," not a raw foreign-key error.
 75. **Google Calendar token expired/revoked** — with Calendar connected, revoke access from your Google account settings, then load the public booking page for that admin — confirm slots still show (fail-open), rather than the page breaking.
 
+---
+
+## Fireflies summaries, MoM delivery & abandoned-payment reminders (needs migrations `0019`, `0020`)
+
+Full background in `PLAN.md` §11. Three new n8n workflows/edge changes: `record_meeting` toggle on event types, `fireflies-webhook`, `mom-ready.json`, `abandoned-payment-cron.json`.
+
+76. Run `0019_meeting_summaries.sql` and `0020_abandoned_payment_reminders.sql`. Set up Fireflies per `n8n/README.md`'s "Fireflies setup" section, import + activate `mom-ready.json` and `abandoned-payment-cron.json`, and set the new Edge Function secrets (`FIREFLIES_API_KEY`, `FIREFLIES_WEBHOOK_SECRET`, `N8N_MOM_WEBHOOK_URL`) before testing anything below.
+77. Event Types → edit one → confirm the **"Record & summarise this meeting"** toggle exists and defaults off. Turn it on and save.
+78. Book that event type as a client → confirm the public event page shows the recording notice ("This session is recorded...") before you book — and that a different event type with the toggle off shows nothing.
+79. Complete a real call on that booking (Google Calendar connected, Fireflies bot should join as an attendee) → after Fireflies finishes processing, confirm: `meeting_summaries` gets a new row, the magic-link page (`/booking/<token>`) shows a "Meeting notes" block with the short summary + action items, and the dashboard's booking detail (LeadDetailModal) shows the fuller version (summary + action items + transcript link) — plus both client and admin receive the MoM by email and WhatsApp.
+80. Book (and complete) an event type with the toggle **off** → confirm no bot joins, no `meeting_summaries` row appears, and neither the magic link nor the booking detail shows a "Meeting notes" section at all.
+81. Start a paid booking, get to the Razorpay checkout, then abandon it (close the tab without paying) → wait for the hold to expire (5-minute sweep) plus the abandoned-reminder cron's 15-minute cutoff → confirm the client gets exactly one email + WhatsApp nudge linking back to the event page (not a dead "your slot is held" link), and `abandoned_reminder_sent` flips to `true` on that booking so it isn't sent twice.
+82. Abandon a checkout, then **immediately rebook and pay successfully** for the same event type with the same email before the reminder would fire → confirm no abandoned-payment reminder is ever sent for the failed attempt (the suppression check in `get_abandoned_bookings`).
+
 ## Still to come (not needed yet, listed so nothing is a surprise later)
 
-- Zaple account/API key — WhatsApp confirmation/reminders (email via Gmail is built; WhatsApp isn't yet)
+- ~~Zaple account/API key — WhatsApp confirmation/reminders (email via Gmail is built; WhatsApp isn't yet)~~ — done: the admin new-booking alert, the client/admin MoM messages, and the abandoned-payment nudge are all built. Booking confirmation and the 1-hour reminder are a deliberate exception — staying email-only, see `PLAN.md` §11.2
 - A domain, once we're ready to deploy beyond `localhost` (also needs adding to the Google OAuth redirect URIs)

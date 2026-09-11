@@ -34,6 +34,11 @@ export interface ManagedBooking {
   request_type: "reschedule" | "cancel" | null;
   request_status: "pending" | "approved" | "rejected" | null;
   request_preferred_start: string | null;
+  // Deliberately just these two fields — the client's copy of the MoM
+  // skips overview/keywords/transcript, which the admin's fuller view (see
+  // getMeetingSummary) does include. See PLAN.md §11.2 "MoM content split".
+  mom_short_summary: string | null;
+  mom_action_items: string[];
 }
 
 function normalize(row: ManagedBooking): ManagedBooking {
@@ -42,6 +47,7 @@ function normalize(row: ManagedBooking): ManagedBooking {
     amount_paid: row.amount_paid === null ? null : Number(row.amount_paid),
     amount_due: row.amount_due === null ? null : Number(row.amount_due),
     admin_weekly_availability: row.admin_weekly_availability ?? {},
+    mom_action_items: row.mom_action_items ?? [],
   };
 }
 

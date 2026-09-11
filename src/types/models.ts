@@ -77,6 +77,7 @@ export interface EventType {
   description: string | null;
   custom_questions: CustomQuestion[];
   is_active: boolean;
+  record_meeting: boolean;
   created_at: string;
   updated_at: string;
 }

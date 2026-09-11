@@ -21,6 +21,7 @@ These run server-side with the `service_role` key (never exposed to the browser)
 | `razorpay-webhook` | The authoritative payment channel — Razorpay calls it server-to-server, so it works even if the client's browser never returns. Authorized by the `X-Razorpay-Signature` HMAC over the **raw** body. Handles `payment.captured`, `payment.failed`, `refund.processed`. Idempotent with the function above |
 | `expire-pending-bookings` | Called every 5 minutes by n8n — releases lapsed payment holds and refunds the discount-code uses they consumed. Authorized by `x-webhook-secret` |
 | `refund-razorpay-payment` | Called from the admin's Requests page when they approve a cancellation with a refund attached. The only part of the requests flow that needs the Razorpay secret — everything else (approve/reject, reschedule) is a plain RLS-guarded table write from the browser |
+| `fireflies-webhook` | Called by Fireflies (server-to-server) once a recorded call's transcript is summarised. Authorized by an HMAC signature over the raw body, same pattern as `razorpay-webhook`. Matches the transcript to a booking by its Google Meet link, stores the summary in `meeting_summaries`, and hands off to n8n's `mom-ready` workflow to actually send the MoM to both sides |
 
 ## One-time setup (do this once you have the Supabase CLI installed)
 
@@ -61,6 +62,15 @@ supabase secrets set RAZORPAY_KEY_SECRET=<your-razorpay-key-secret>
 # dashboard when creating the webhook (see below).
 supabase secrets set RAZORPAY_WEBHOOK_SECRET=<a-random-string-you-generate>
 
+# Fireflies — meeting summaries + MoM delivery (see PLAN.md §11). Needs a
+# Fireflies plan with API access.
+supabase secrets set FIREFLIES_API_KEY=<your-fireflies-api-key>
+# You invent this one, then paste the same string into Fireflies' webhook
+# settings when pointing it at fireflies-webhook (see n8n/README.md).
+supabase secrets set FIREFLIES_WEBHOOK_SECRET=<a-random-string-you-generate>
+# The mom-ready.json n8n workflow's webhook URL (see n8n/README.md).
+supabase secrets set N8N_MOM_WEBHOOK_URL=<your-n8n-mom-ready-webhook-url>
+
 # Deploy
 supabase functions deploy create-admin
 supabase functions deploy update-admin
@@ -77,6 +87,7 @@ supabase functions deploy verify-razorpay-payment --no-verify-jwt
 supabase functions deploy razorpay-webhook --no-verify-jwt
 supabase functions deploy expire-pending-bookings --no-verify-jwt
 supabase functions deploy refund-razorpay-payment
+supabase functions deploy fireflies-webhook --no-verify-jwt
 ```
 
 ## Razorpay webhook setup

@@ -5,7 +5,7 @@ import { Controller, useFieldArray, useForm, useWatch, type Control, type FieldE
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import { Modal, Button, Checkbox, FormField, Input, Textarea, Select } from "@/components/ui";
+import { Modal, Button, Checkbox, FormField, Input, Textarea, Select, Switch } from "@/components/ui";
 import { eventTypeFormSchema, type EventTypeFormInput, type EventTypeFormValues } from "@/lib/validations/eventType";
 import { createEventType, updateEventType } from "@/lib/api/eventTypes";
 import type { EventType } from "@/types/models";
@@ -22,13 +22,14 @@ function emptyQuestion() {
 
 function toFormValues(eventType: EventType | null): EventTypeFormInput {
   if (!eventType) {
-    return { name: "", duration_minutes: 30, price: 0, description: "", custom_questions: [] };
+    return { name: "", duration_minutes: 30, price: 0, description: "", record_meeting: false, custom_questions: [] };
   }
   return {
     name: eventType.name,
     duration_minutes: eventType.duration_minutes,
     price: eventType.price,
     description: eventType.description ?? "",
+    record_meeting: eventType.record_meeting,
     custom_questions: eventType.custom_questions.map((q) => ({
       id: q.id,
       label: q.label,
@@ -183,6 +184,23 @@ export function EventTypeFormModal({
           >
             <Textarea id="description" rows={3} placeholder="What this call is about..." {...register("description")} />
           </FormField>
+
+          <div className="space-y-2 rounded-lg border border-border p-3">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium text-neutral-800">Record & summarise this meeting</span>
+              <Controller
+                control={control}
+                name="record_meeting"
+                render={({ field }) => (
+                  <Switch checked={field.value} onChange={field.onChange} label="Record and summarise this meeting" />
+                )}
+              />
+            </div>
+            <p className="text-xs text-neutral-500">
+              A Fireflies bot joins the call and sends both sides the notes afterwards. The client sees this on the
+              booking page before they book. Off by default.
+            </p>
+          </div>
 
           <div>
             <div className="mb-2 flex items-center justify-between">

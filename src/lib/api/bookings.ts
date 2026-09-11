@@ -2,7 +2,7 @@ import { createClient } from "@/lib/supabase/client";
 import type { Booking, CustomQuestion, LeadTag } from "@/types/models";
 
 export interface BookingWithEventType extends Booking {
-  event_types: { name: string; duration_minutes: number; custom_questions: CustomQuestion[] } | null;
+  event_types: { name: string; duration_minutes: number; custom_questions: CustomQuestion[]; record_meeting: boolean } | null;
 }
 
 export type BookingSortField = "start_time" | "created_at";
@@ -43,7 +43,7 @@ export async function listBookings(adminId: string, params: ListBookingsParams):
 
   let query = supabase
     .from("bookings")
-    .select("*, event_types(name, duration_minutes, custom_questions)", { count: "exact" })
+    .select("*, event_types(name, duration_minutes, custom_questions, record_meeting)", { count: "exact" })
     .eq("admin_id", adminId);
 
   if (params.status && params.status !== "all") {
