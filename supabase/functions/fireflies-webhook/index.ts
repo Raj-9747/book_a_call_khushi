@@ -170,11 +170,16 @@ Deno.serve(async (req) => {
     return jsonResponse({ error: "Invalid payload" }, 400);
   }
 
-  // Ignore anything but the "done" event — Fireflies also fires webhooks
-  // for earlier stages (e.g. "Transcription started") that have no summary
-  // yet to fetch.
-  if (event.eventType && event.eventType !== "Transcription completed") {
-    return jsonResponse({ skipped: "not a completion event", eventType: event.eventType });
+  // Only skip the two subscribed events that fire BEFORE a summary exists
+  // ("Meeting Bot Joined" at call start, "Meeting Transcribed" once the
+  // transcript is ready but before it's summarised). Deliberately not an
+  // allowlist checking for "Meeting Summarized" specifically — the exact
+  // event names sent in this field haven't been confirmed against a real
+  // payload (see PLAN.md §11.4/§11.8), so the real gate is the summary-data
+  // check just below instead of an exact string match here.
+  const EARLY_EVENTS = ["Meeting Bot Joined", "Meeting Transcribed"];
+  if (event.eventType && EARLY_EVENTS.includes(event.eventType)) {
+    return jsonResponse({ skipped: "not a summary-ready event", eventType: event.eventType });
   }
 
   const meetingId = event.meetingId;
@@ -198,6 +203,15 @@ Deno.serve(async (req) => {
   const transcript = await fetchTranscript(meetingId);
   if (!transcript) {
     return jsonResponse({ error: "Failed to fetch transcript" }, 502);
+  }
+
+  // The real "is this actually ready" gate — belt-and-braces alongside the
+  // EARLY_EVENTS check above, since that one only catches event names we
+  // already know about. A "Meeting Transcribed" delivery (or any other
+  // early event we haven't listed) would otherwise sail through with an
+  // empty summary and get stored/sent as if the call were fully processed.
+  if (!transcript.summary?.short_summary && !transcript.summary?.overview) {
+    return jsonResponse({ skipped: "summary not ready yet", meetingId });
   }
 
   const meetLink = normalizeMeetLink(transcript.meeting_link);
