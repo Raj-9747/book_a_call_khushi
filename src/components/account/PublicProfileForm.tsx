@@ -20,7 +20,13 @@ import {
   Input,
   Textarea,
 } from "@/components/ui";
-import { removeAdminPhoto, updateProfileFields, uploadAdminPhoto } from "@/lib/api/admins";
+import {
+  removeAdminLogo,
+  removeAdminPhoto,
+  updateProfileFields,
+  uploadAdminLogo,
+  uploadAdminPhoto,
+} from "@/lib/api/admins";
 import type { Admin } from "@/types/models";
 
 /** Optional URL field: empty string is valid and stores as null, but if the
@@ -47,6 +53,11 @@ const schema = z.object({
   instagram_url: optionalUrl,
   x_url: optionalUrl,
   website_url: optionalUrl,
+  company_name: z
+    .string()
+    .trim()
+    .max(120, "Keep the company name under 120 characters")
+    .transform((value) => (value === "" ? null : value)),
 });
 type FormInput = z.input<typeof schema>;
 type FormValues = z.output<typeof schema>;
@@ -54,8 +65,11 @@ type FormValues = z.output<typeof schema>;
 export function PublicProfileForm({ admin }: { admin: Admin }) {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const logoInputRef = useRef<HTMLInputElement>(null);
   const [photoUrl, setPhotoUrl] = useState(admin.photo_url);
   const [photoBusy, setPhotoBusy] = useState(false);
+  const [logoUrl, setLogoUrl] = useState(admin.company_logo_url);
+  const [logoBusy, setLogoBusy] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   const {
@@ -72,6 +86,7 @@ export function PublicProfileForm({ admin }: { admin: Admin }) {
       instagram_url: admin.instagram_url ?? "",
       x_url: admin.x_url ?? "",
       website_url: admin.website_url ?? "",
+      company_name: admin.company_name ?? "",
     },
   });
 
@@ -108,6 +123,38 @@ export function PublicProfileForm({ admin }: { admin: Admin }) {
     }
   }
 
+  async function handleLogoChange(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+
+    setLogoBusy(true);
+    try {
+      const url = await uploadAdminLogo(admin.id, file, logoUrl);
+      setLogoUrl(url);
+      toast.success("Logo updated");
+      router.refresh();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to upload logo");
+    } finally {
+      setLogoBusy(false);
+    }
+  }
+
+  async function handleLogoRemove() {
+    setLogoBusy(true);
+    try {
+      await removeAdminLogo(admin.id, logoUrl);
+      setLogoUrl(null);
+      toast.success("Logo removed");
+      router.refresh();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to remove logo");
+    } finally {
+      setLogoBusy(false);
+    }
+  }
+
   async function onSubmit(values: FormValues) {
     setSubmitting(true);
     try {
@@ -120,6 +167,7 @@ export function PublicProfileForm({ admin }: { admin: Admin }) {
         instagram_url: values.instagram_url ?? "",
         x_url: values.x_url ?? "",
         website_url: values.website_url ?? "",
+        company_name: values.company_name ?? "",
       });
       router.refresh();
     } catch (err) {
@@ -204,6 +252,55 @@ export function PublicProfileForm({ admin }: { admin: Admin }) {
           <FormField label="Website" htmlFor="profile-website" error={errors.website_url?.message}>
             <Input id="profile-website" placeholder="https://yoursite.com" {...register("website_url")} />
           </FormField>
+
+          <div className="space-y-4 border-t border-border pt-5">
+            <div>
+              <p className="text-sm font-medium text-neutral-800">Company branding</p>
+              <p className="text-xs text-neutral-500">
+                Shown on the meeting-notes document sent after a recorded call. Leave blank to send it unbranded.
+              </p>
+            </div>
+
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+              <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border bg-neutral-50">
+                {logoUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element -- external Storage URL, not a local asset
+                  <img src={logoUrl} alt="Company logo" className="h-full w-full object-contain" />
+                ) : (
+                  <span className="text-xs text-neutral-400">No logo</span>
+                )}
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <input
+                  ref={logoInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  className="hidden"
+                  onChange={handleLogoChange}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  isLoading={logoBusy}
+                  onClick={() => logoInputRef.current?.click()}
+                >
+                  <Upload className="h-4 w-4" />
+                  {logoUrl ? "Replace logo" : "Upload logo"}
+                </Button>
+                {logoUrl && (
+                  <Button type="button" variant="ghost" disabled={logoBusy} onClick={handleLogoRemove}>
+                    <Trash2 className="h-4 w-4" />
+                    Remove
+                  </Button>
+                )}
+                <p className="w-full text-xs text-neutral-500">JPG, PNG or WebP. Up to 2 MB.</p>
+              </div>
+            </div>
+
+            <FormField label="Company name" htmlFor="profile-company-name" error={errors.company_name?.message}>
+              <Input id="profile-company-name" placeholder="e.g. Phaze" {...register("company_name")} />
+            </FormField>
+          </div>
         </CardContent>
         <CardFooter>
           <Button type="submit" isLoading={submitting} disabled={!isDirty}>

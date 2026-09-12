@@ -85,6 +85,8 @@ export interface ProfileFields {
   accepting_bookings?: boolean;
   unavailable_message?: string | null;
   photo_url?: string | null;
+  company_name?: string | null;
+  company_logo_url?: string | null;
 }
 
 export async function updateProfileFields(id: string, fields: ProfileFields): Promise<void> {
@@ -153,6 +155,69 @@ export async function removeAdminPhoto(adminId: string, currentUrl: string | nul
 
   const path = photoPathFromUrl(currentUrl);
   if (path) await supabase.storage.from(PHOTO_BUCKET).remove([path]);
+}
+
+const LOGO_BUCKET = "admin-logos";
+const MAX_LOGO_BYTES = 2 * 1024 * 1024;
+const ALLOWED_LOGO_TYPES = ["image/jpeg", "image/png", "image/webp"];
+
+function logoPathFromUrl(url: string | null): string | null {
+  if (!url) return null;
+  const marker = `/${LOGO_BUCKET}/`;
+  const index = url.indexOf(marker);
+  if (index === -1) return null;
+  const path = url.slice(index + marker.length).split("?")[0];
+  return path ? decodeURIComponent(path) : null;
+}
+
+/** Same upload/replace-and-clean-up shape as uploadAdminPhoto — separate
+ * bucket and column, since a company logo is conceptually different from
+ * the admin's own headshot and an admin may well want both. */
+export async function uploadAdminLogo(adminId: string, file: File, previousUrl: string | null): Promise<string> {
+  if (!ALLOWED_LOGO_TYPES.includes(file.type)) {
+    throw new Error("Please choose a JPG, PNG or WebP image.");
+  }
+  if (file.size > MAX_LOGO_BYTES) {
+    throw new Error("That image is larger than 2 MB. Please choose a smaller one.");
+  }
+
+  const supabase = createClient();
+  const extension = file.type === "image/png" ? "png" : file.type === "image/webp" ? "webp" : "jpg";
+  const path = `${adminId}/${crypto.randomUUID()}.${extension}`;
+
+  const { error: uploadError } = await supabase.storage
+    .from(LOGO_BUCKET)
+    .upload(path, file, { contentType: file.type, upsert: false });
+  if (uploadError) throw uploadError;
+
+  const {
+    data: { publicUrl },
+  } = supabase.storage.from(LOGO_BUCKET).getPublicUrl(path);
+
+  const { error: updateError } = await supabase
+    .from("admins")
+    .update({ company_logo_url: publicUrl })
+    .eq("id", adminId);
+  if (updateError) {
+    await supabase.storage.from(LOGO_BUCKET).remove([path]);
+    throw updateError;
+  }
+
+  const oldPath = logoPathFromUrl(previousUrl);
+  if (oldPath && oldPath !== path) {
+    await supabase.storage.from(LOGO_BUCKET).remove([oldPath]);
+  }
+
+  return publicUrl;
+}
+
+export async function removeAdminLogo(adminId: string, currentUrl: string | null): Promise<void> {
+  const supabase = createClient();
+  const { error } = await supabase.from("admins").update({ company_logo_url: null }).eq("id", adminId);
+  if (error) throw error;
+
+  const path = logoPathFromUrl(currentUrl);
+  if (path) await supabase.storage.from(LOGO_BUCKET).remove([path]);
 }
 
 /** An admin editing their OWN name/phone/email/slug. Changing email forces

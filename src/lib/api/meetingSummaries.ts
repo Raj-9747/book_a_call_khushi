@@ -13,6 +13,7 @@ export interface MeetingSummary {
   action_items: string[];
   keywords: string[];
   transcript_url: string | null;
+  mom_pdf_url: string | null;
   duration_minutes: number | null;
   mom_sent_at: string | null;
   created_at: string;
@@ -22,7 +23,7 @@ export async function getMeetingSummary(bookingId: string): Promise<MeetingSumma
   const supabase = createClient();
   const { data, error } = await supabase
     .from("meeting_summaries")
-    .select("id, booking_id, title, short_summary, overview, action_items, keywords, transcript_url, duration_minutes, mom_sent_at, created_at")
+    .select("id, booking_id, title, short_summary, overview, action_items, keywords, transcript_url, mom_pdf_url, duration_minutes, mom_sent_at, created_at")
     .eq("booking_id", bookingId)
     .maybeSingle();
 

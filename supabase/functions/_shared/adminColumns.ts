@@ -26,5 +26,7 @@ export const ADMIN_COLUMNS = [
   "unavailable_message",
   "min_notice_minutes",
   "booking_window_days",
+  "company_name",
+  "company_logo_url",
   "created_at",
 ].join(", ");

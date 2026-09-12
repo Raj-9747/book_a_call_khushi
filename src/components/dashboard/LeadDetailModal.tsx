@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { formatInTimeZone } from "date-fns-tz";
-import { FileText, Sparkles } from "lucide-react";
+import { FileDown, FileText, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { Modal, Badge, Button, FormField, Select, Textarea } from "@/components/ui";
 import { updateBookingLeadInfo } from "@/lib/api/bookings";
@@ -134,17 +134,30 @@ export function LeadDetailModal({
                     ))}
                   </ul>
                 )}
-                {summary.transcript_url && (
-                  <a
-                    href={summary.transcript_url}
-                    target="_blank"
-                    rel="noreferrer noopener"
-                    className="inline-flex items-center gap-1.5 text-brand-600 hover:underline"
-                  >
-                    <FileText className="h-3.5 w-3.5" />
-                    View full transcript
-                  </a>
-                )}
+                <div className="flex flex-wrap gap-x-4 gap-y-1.5">
+                  {summary.mom_pdf_url && (
+                    <a
+                      href={summary.mom_pdf_url}
+                      target="_blank"
+                      rel="noreferrer noopener"
+                      className="inline-flex items-center gap-1.5 text-brand-600 hover:underline"
+                    >
+                      <FileDown className="h-3.5 w-3.5" />
+                      Download PDF
+                    </a>
+                  )}
+                  {summary.transcript_url && (
+                    <a
+                      href={summary.transcript_url}
+                      target="_blank"
+                      rel="noreferrer noopener"
+                      className="inline-flex items-center gap-1.5 text-brand-600 hover:underline"
+                    >
+                      <FileText className="h-3.5 w-3.5" />
+                      View full transcript
+                    </a>
+                  )}
+                </div>
               </div>
             ) : (
               <p className="text-sm text-neutral-400">

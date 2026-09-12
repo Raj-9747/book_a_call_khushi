@@ -25,6 +25,11 @@ export interface Admin {
   x_url: string | null;
   website_url: string | null;
 
+  // Shown on the MoM document/email/WhatsApp when set — optional, per
+  // admin, same "blank means hidden" convention as the rest of this block.
+  company_name: string | null;
+  company_logo_url: string | null;
+
   // Booking configuration
   accepting_bookings: boolean;
   unavailable_message: string | null;

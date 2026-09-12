@@ -39,6 +39,7 @@ export interface ManagedBooking {
   // getMeetingSummary) does include. See PLAN.md §11.2 "MoM content split".
   mom_short_summary: string | null;
   mom_action_items: string[];
+  mom_pdf_url: string | null;
 }
 
 function normalize(row: ManagedBooking): ManagedBooking {

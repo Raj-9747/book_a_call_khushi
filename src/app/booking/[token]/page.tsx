@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { formatInTimeZone } from "date-fns-tz";
-import { CalendarDays, Clock, Sparkles, Video } from "lucide-react";
+import { CalendarDays, Clock, FileDown, Sparkles, Video } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { Avatar, Badge } from "@/components/ui";
 import { getBookingByToken } from "@/lib/api/manageBooking";
@@ -138,6 +138,17 @@ export default async function ManageBookingPage({ params }: { params: Promise<{ 
                       <li key={i}>{item}</li>
                     ))}
                   </ul>
+                )}
+                {booking.mom_pdf_url && (
+                  <a
+                    href={booking.mom_pdf_url}
+                    target="_blank"
+                    rel="noreferrer noopener"
+                    className="mt-3 inline-flex items-center gap-1.5 text-sm font-medium text-brand-700 hover:underline"
+                  >
+                    <FileDown className="h-3.5 w-3.5" />
+                    Download as PDF
+                  </a>
                 )}
               </div>
             )}
