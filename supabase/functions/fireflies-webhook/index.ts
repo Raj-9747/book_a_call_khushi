@@ -167,8 +167,15 @@ Deno.serve(async (req) => {
   try {
     event = JSON.parse(rawBody);
   } catch {
+    console.error("fireflies-webhook: invalid JSON payload", rawBody.slice(0, 500));
     return jsonResponse({ error: "Invalid payload" }, 400);
   }
+
+  // Every other skip/error path below logs too, but this one line is the
+  // single most useful thing to have in the log tab when debugging a
+  // report of "nothing happened" — it's the raw shape of what Fireflies
+  // actually sent, printed before any of our own logic runs on it.
+  console.log("fireflies-webhook: received", JSON.stringify(event));
 
   // Only skip the two subscribed events that fire BEFORE a summary exists
   // ("Meeting Bot Joined" at call start, "Meeting Transcribed" once the
@@ -179,6 +186,7 @@ Deno.serve(async (req) => {
   // check just below instead of an exact string match here.
   const EARLY_EVENTS = ["Meeting Bot Joined", "Meeting Transcribed"];
   if (event.eventType && EARLY_EVENTS.includes(event.eventType)) {
+    console.log("fireflies-webhook: skipped — early event", event.eventType);
     return jsonResponse({ skipped: "not a summary-ready event", eventType: event.eventType });
   }
 
@@ -190,6 +198,7 @@ Deno.serve(async (req) => {
     // — a 4xx there reads as "webhook broken" in their dashboard when
     // nothing actually is. 200+skipped, same as every other "nothing to
     // do here" case in this function, not an error.
+    console.log("fireflies-webhook: skipped — no meetingId");
     return jsonResponse({ skipped: "no meetingId in payload — likely a connectivity test" });
   }
 
@@ -203,11 +212,13 @@ Deno.serve(async (req) => {
     .eq("fireflies_meeting_id", meetingId)
     .maybeSingle();
   if (existing) {
+    console.log("fireflies-webhook: skipped — already processed", meetingId);
     return jsonResponse({ skipped: "already processed" });
   }
 
   const transcript = await fetchTranscript(meetingId);
   if (!transcript) {
+    console.error("fireflies-webhook: transcript fetch returned nothing for", meetingId);
     return jsonResponse({ error: "Failed to fetch transcript" }, 502);
   }
 
@@ -217,6 +228,7 @@ Deno.serve(async (req) => {
   // early event we haven't listed) would otherwise sail through with an
   // empty summary and get stored/sent as if the call were fully processed.
   if (!transcript.summary?.short_summary && !transcript.summary?.overview) {
+    console.log("fireflies-webhook: skipped — summary not ready yet", meetingId);
     return jsonResponse({ skipped: "summary not ready yet", meetingId });
   }
 
@@ -224,6 +236,7 @@ Deno.serve(async (req) => {
   if (!meetLink) {
     // No Meet link on the transcript at all — nothing to match against.
     // Not our error; return 200 so Fireflies doesn't retry forever.
+    console.log("fireflies-webhook: skipped — transcript has no meeting_link", meetingId);
     return jsonResponse({ skipped: "no meeting_link on transcript" });
   }
 
@@ -240,9 +253,15 @@ Deno.serve(async (req) => {
   if (!booking) {
     // Someone may have invited the Fireflies bot to a non-Zaptly meeting —
     // that's not an error, and a non-2xx here would make Fireflies retry
-    // forever for a match that will never appear.
+    // forever for a match that will never appear. Logging both sides of
+    // the comparison — this is the single most useful line if the real
+    // cause turns out to be a meet_link mismatch (trailing slash, query
+    // string, case) rather than a genuinely unrelated meeting.
+    console.log("fireflies-webhook: skipped — no matching booking. transcript meetLink =", meetLink, "| candidates checked =", (candidates ?? []).length);
     return jsonResponse({ skipped: "no matching booking", meetLink });
   }
+
+  console.log("fireflies-webhook: matched booking", booking.id, "for meeting", meetingId);
 
   const { data: admin } = await supabase
     .from("admins")
@@ -323,5 +342,6 @@ Deno.serve(async (req) => {
 
   await supabase.from("meeting_summaries").update({ mom_sent_at: new Date().toISOString() }).eq("fireflies_meeting_id", meetingId);
 
+  console.log("fireflies-webhook: success — MoM dispatched for booking", booking.id);
   return jsonResponse({ success: true });
 });
