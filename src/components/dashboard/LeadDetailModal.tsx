@@ -125,14 +125,43 @@ export function LeadDetailModal({
             {summary === undefined ? (
               <p className="text-sm text-neutral-400">Loading…</p>
             ) : summary ? (
-              <div className="space-y-2.5 rounded-lg bg-neutral-50 px-3.5 py-3 text-sm">
-                {summary.short_summary && <p className="text-neutral-800">{summary.short_summary}</p>}
-                {summary.action_items.length > 0 && (
-                  <ul className="list-disc space-y-1 pl-4 text-neutral-700">
-                    {summary.action_items.map((item, i) => (
-                      <li key={i}>{item}</li>
+              <div className="space-y-3 rounded-lg bg-neutral-50 px-3.5 py-3 text-sm">
+                {summary.gist && (
+                  <p className="rounded-md bg-brand-50 px-3 py-2 text-sm italic text-brand-800">{summary.gist}</p>
+                )}
+                {summary.overview_points.length > 0 ? (
+                  <ul className="list-disc space-y-1.5 pl-4 text-neutral-700">
+                    {summary.overview_points.map((point, i) => (
+                      <li key={i}>
+                        {point.heading && <span className="font-medium text-neutral-900">{point.heading}: </span>}
+                        {point.text}
+                      </li>
                     ))}
                   </ul>
+                ) : (
+                  summary.short_summary && <p className="text-neutral-800">{summary.short_summary}</p>
+                )}
+                {summary.action_items.length > 0 && (
+                  <div>
+                    <p className="mb-1 text-xs font-medium uppercase tracking-wide text-neutral-500">Action items</p>
+                    <ul className="space-y-1 text-neutral-700">
+                      {summary.action_items.map((item, i) => (
+                        <li key={i} className="flex items-start gap-1.5">
+                          <span className="mt-0.5 text-neutral-400">☐</span>
+                          {item}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {summary.keywords.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {summary.keywords.map((k) => (
+                      <span key={k} className="rounded-full bg-brand-100 px-2 py-0.5 text-xs text-brand-700">
+                        {k}
+                      </span>
+                    ))}
+                  </div>
                 )}
                 <div className="flex flex-wrap gap-x-4 gap-y-1.5">
                   {summary.mom_pdf_url && (

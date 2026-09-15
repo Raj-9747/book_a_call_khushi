@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/client";
+import type { OverviewPoint } from "@/lib/api/meetingSummaries";
 
 /** What the magic-link page can see. Deliberately narrow: the token is a
  * bearer credential sitting in an email, so it resolves to this one
@@ -34,9 +35,12 @@ export interface ManagedBooking {
   request_type: "reschedule" | "cancel" | null;
   request_status: "pending" | "approved" | "rejected" | null;
   request_preferred_start: string | null;
-  // Deliberately just these two fields — the client's copy of the MoM
-  // skips overview/keywords/transcript, which the admin's fuller view (see
-  // getMeetingSummary) does include. See PLAN.md §11.2 "MoM content split".
+  // Deliberately just this subset — the client's copy of the MoM skips the
+  // raw overview text, keywords and transcript link, which the admin's
+  // fuller view (see getMeetingSummary) does include. See PLAN.md §11.2
+  // "MoM content split".
+  mom_gist: string | null;
+  mom_overview_points: OverviewPoint[];
   mom_short_summary: string | null;
   mom_action_items: string[];
   mom_pdf_url: string | null;
@@ -49,6 +53,7 @@ function normalize(row: ManagedBooking): ManagedBooking {
     amount_due: row.amount_due === null ? null : Number(row.amount_due),
     admin_weekly_availability: row.admin_weekly_availability ?? {},
     mom_action_items: row.mom_action_items ?? [],
+    mom_overview_points: row.mom_overview_points ?? [],
   };
 }
 

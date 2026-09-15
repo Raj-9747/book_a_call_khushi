@@ -123,19 +123,40 @@ export default async function ManageBookingPage({ params }: { params: Promise<{ 
               </div>
             )}
 
-            {booking.mom_short_summary && (
+            {(booking.mom_gist || booking.mom_overview_points.length > 0 || booking.mom_short_summary) && (
               <div className="rounded-lg border border-brand-200 bg-brand-50 px-4 py-3.5">
                 <p className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-brand-700">
                   <Sparkles className="h-3.5 w-3.5" />
                   Meeting notes
                 </p>
-                <p className="mt-1.5 whitespace-pre-line text-sm leading-relaxed text-brand-900">
-                  {booking.mom_short_summary}
-                </p>
+                {booking.mom_gist && (
+                  <p className="mt-2 rounded-md bg-surface/60 px-3 py-2 text-sm italic text-brand-900">
+                    {booking.mom_gist}
+                  </p>
+                )}
+                {booking.mom_overview_points.length > 0 ? (
+                  <ul className="mt-2.5 list-disc space-y-1.5 pl-4 text-sm text-brand-900">
+                    {booking.mom_overview_points.map((point, i) => (
+                      <li key={i}>
+                        {point.heading && <span className="font-medium">{point.heading}: </span>}
+                        {point.text}
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  booking.mom_short_summary && (
+                    <p className="mt-1.5 whitespace-pre-line text-sm leading-relaxed text-brand-900">
+                      {booking.mom_short_summary}
+                    </p>
+                  )
+                )}
                 {booking.mom_action_items.length > 0 && (
-                  <ul className="mt-2.5 list-disc space-y-1 pl-4 text-sm text-brand-900">
+                  <ul className="mt-2.5 space-y-1 text-sm text-brand-900">
                     {booking.mom_action_items.map((item, i) => (
-                      <li key={i}>{item}</li>
+                      <li key={i} className="flex items-start gap-1.5">
+                        <span className="mt-0.5 text-brand-400">☐</span>
+                        {item}
+                      </li>
                     ))}
                   </ul>
                 )}
