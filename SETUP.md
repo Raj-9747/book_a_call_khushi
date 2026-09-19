@@ -26,6 +26,10 @@ Things needed from your side to get the current build running and testable. Grow
   - `0018_payment_summary.sql` — `get_payment_summary()`, the collected/refunded/net totals behind the Payments page
   - `0019_meeting_summaries.sql` — adds `record_meeting` to event types, the `meeting_summaries` table Fireflies summaries land in, and re-creates `get_public_event_type`/`get_booking_by_token` to carry that flag and the client's copy of the MoM
   - `0020_abandoned_payment_reminders.sql` — adds `abandoned_reminder_sent` to bookings, and the two RPCs (`get_abandoned_bookings`, `mark_abandoned_reminder_sent`) the new abandoned-payment-reminder n8n cron calls
+  - `0021_bound_abandoned_reminder_window.sql` — caps `get_abandoned_bookings` at a 2-hour window so a booking that expired days ago is never reminded (and can't loop)
+  - `0022_company_branding_and_mom_pdf.sql` — optional company name/logo on the admin profile, the `admin-logos` and `meeting-moms` Storage buckets, and `meeting_summaries.mom_pdf_url`
+  - `0023_mom_overview_points.sql` — `gist` + structured `overview_points` on meeting summaries, so the MoM renders as sections instead of one paragraph
+  - `0024_onboarding_and_reschedule_signal.sql` — `admins.onboarding_dismissed_at` (first-run popup shows once) and `bookings.rescheduled_at` / `previous_start_time` (lets notifications say "rescheduled" instead of "accepted"). **Run this before deploying the frontend** — `onboarding_dismissed_at` is in the admin column list, so the app fails to load the admin row (and bounces to `/login`) if the column doesn't exist yet
 
 After running `0009`, confirm the bucket exists: Supabase Dashboard → Storage → you should see **`admin-photos`** (public, 2 MB limit, JPG/PNG/WebP only). The migration creates it, so there's nothing to click — this is just a check.
 
@@ -262,6 +266,21 @@ Full background in `PLAN.md` §11. Three new n8n workflows/edge changes: `record
 80. Book (and complete) an event type with the toggle **off** → confirm no bot joins, no `meeting_summaries` row appears, and neither the magic link nor the booking detail shows a "Meeting notes" section at all.
 81. Start a paid booking, get to the Razorpay checkout, then abandon it (close the tab without paying) → wait for the hold to expire (5-minute sweep) plus the abandoned-reminder cron's 15-minute cutoff → confirm the client gets exactly one email + WhatsApp nudge linking back to the event page (not a dead "your slot is held" link), and `abandoned_reminder_sent` flips to `true` on that booking so it isn't sent twice.
 82. Abandon a checkout, then **immediately rebook and pay successfully** for the same event type with the same email before the reminder would fire → confirm no abandoned-payment reminder is ever sent for the failed attempt (the suppression check in `get_abandoned_bookings`).
+
+---
+
+## First-run onboarding, reschedule-aware messages, meeting links (needs migration `0024`)
+
+Full background in `PLAN.md` §12.
+
+83. Create a brand-new admin (Manage Admins → Add) and log in as them → the Overview should open a **"Welcome to Zaptly"** popup listing four steps (Connect Google Calendar → Update your profile → Set your availability → Create your first event type), with a **Getting started** card behind it showing "0 of 4".
+84. Click **I'll do this later** (or the ✕, or click outside) → popup closes; refresh, and log in on a second browser → it does **not** reopen. The Getting started card is still there.
+85. Do the steps one at a time and refresh after each → that step gets a green tick and the percentage moves. Confirm none tick prematurely: saving *only* a name change doesn't complete "profile", and a new admin's availability step stays open until the availability form is actually saved. When all four are done the card disappears.
+86. Book a session as a client → email subject **"Booking accepted: …"**, body "Your booking has been accepted ✅", with the **Join with Google Meet** link and a manage link.
+87. From the magic link, request a reschedule; approve it in Requests → email subject **"Rescheduled: …"**, body "Your meeting has been rescheduled to <new time>" with the old time struck through, and the **new** Meet link (the old event is deleted, so the link changes).
+88. Book with an admin who has **no** Google Calendar connected → email says "Your host will share the meeting link with you separately" (no broken/empty link).
+89. Once the four WhatsApp templates are approved and their IDs pasted into the two WhatsApp nodes: the admin **and** the client each get a WhatsApp with the meeting link, and a reschedule uses the "rescheduled" template. A client with no phone gets email only.
+90. The 1-hour reminder email now includes the Meet link and a manage link.
 
 ## Still to come (not needed yet, listed so nothing is a surprise later)
 

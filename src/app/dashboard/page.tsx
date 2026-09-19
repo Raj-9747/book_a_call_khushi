@@ -1,12 +1,12 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { CalendarClock, CalendarCheck, Clock, ListChecks } from "lucide-react";
+import { CalendarCheck, Clock, ListChecks } from "lucide-react";
 import { getCurrentAdmin } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
 import { getDashboardOverview } from "@/lib/api/dashboardStats";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Card, CardContent } from "@/components/ui";
-import { GoogleCalendarConnect } from "@/components/dashboard/GoogleCalendarConnect";
+import { OnboardingGuide } from "@/components/dashboard/OnboardingGuide";
 import { DashboardStats } from "@/components/dashboard/DashboardStats";
 
 const QUICK_LINKS = [
@@ -20,28 +20,33 @@ export default async function DashboardOverviewPage() {
   if (!admin) redirect("/login");
 
   const supabase = await createClient();
-  const overview = await getDashboardOverview(supabase);
+  const [overview, { count: eventTypeCount }] = await Promise.all([
+    getDashboardOverview(supabase),
+    // RLS scopes this to the caller's own event types.
+    supabase.from("event_types").select("id", { count: "exact", head: true }),
+  ]);
+
+  // Every onboarding step is read from real state, never from "they clicked
+  // through it". weekly_availability is `{}` until an admin saves the
+  // availability form, so "any day enabled" means they genuinely set it.
+  const weekly = (admin.weekly_availability ?? {}) as Record<string, { enabled?: boolean } | undefined>;
+  const onboardingSteps = {
+    calendarConnected: admin.google_calendar_connected,
+    profileDone: Boolean(admin.headline?.trim() || admin.about?.trim() || admin.photo_url),
+    availabilityDone: Object.values(weekly).some((day) => day?.enabled),
+    eventTypeDone: (eventTypeCount ?? 0) > 0,
+  };
 
   return (
     <>
       <PageHeader title={`Welcome, ${admin.name.split(" ")[0]}`} description="Here's your Zaptly overview" />
       <div className="space-y-4 p-4 sm:p-8">
-        {!admin.google_calendar_connected && (
-          <Card className="border-brand-200 bg-brand-50">
-            <CardContent className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex items-start gap-3">
-                <CalendarClock className="mt-0.5 h-5 w-5 shrink-0 text-brand-600" />
-                <div>
-                  <p className="text-sm font-medium text-brand-900">Connect your Google Calendar</p>
-                  <p className="text-sm text-brand-700">
-                    Zaptly checks your calendar for conflicts before showing a slot as available to clients.
-                  </p>
-                </div>
-              </div>
-              <GoogleCalendarConnect connected={false} />
-            </CardContent>
-          </Card>
-        )}
+        <OnboardingGuide
+          adminId={admin.id}
+          firstName={admin.name.split(" ")[0]}
+          steps={onboardingSteps}
+          dismissed={Boolean(admin.onboarding_dismissed_at)}
+        />
 
         <DashboardStats overview={overview} />
 

@@ -28,5 +28,6 @@ export const ADMIN_COLUMNS = [
   "booking_window_days",
   "company_name",
   "company_logo_url",
+  "onboarding_dismissed_at",
   "created_at",
 ].join(", ");

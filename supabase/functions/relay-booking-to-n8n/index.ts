@@ -140,6 +140,18 @@ Deno.serve(async (req) => {
         // the Google Calendar event creation step).
         start_time_ist: formatInTimeZone(booking.start_time, "Asia/Kolkata"),
         start_time_client_tz: formatInTimeZone(booking.start_time, booking.client_timezone || "Asia/Kolkata"),
+        // A reschedule runs through this same pipeline as a first booking
+        // (approveReschedule re-opens confirmation_sent), so this flag is
+        // the only thing that lets n8n say "rescheduled to …" instead of
+        // "your booking is accepted". rescheduled_at is written in the same
+        // UPDATE as the new time, so it's already on this webhook record.
+        is_reschedule: Boolean(booking.rescheduled_at),
+        previous_start_time_ist: booking.previous_start_time
+          ? formatInTimeZone(booking.previous_start_time, "Asia/Kolkata")
+          : null,
+        previous_start_time_client_tz: booking.previous_start_time
+          ? formatInTimeZone(booking.previous_start_time, booking.client_timezone || "Asia/Kolkata")
+          : null,
         client_name: booking.client_name,
         client_email: booking.client_email,
         client_phone: booking.client_phone,

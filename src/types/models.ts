@@ -30,6 +30,9 @@ export interface Admin {
   company_name: string | null;
   company_logo_url: string | null;
 
+  /** Set once the first-visit setup popup has been closed or skipped. */
+  onboarding_dismissed_at: string | null;
+
   // Booking configuration
   accepting_bookings: boolean;
   unavailable_message: string | null;
@@ -123,6 +126,10 @@ export interface Booking {
   google_event_id: string | null;
   meet_link: string | null;
   reminder_sent: boolean;
+  /** Set by an approved reschedule; null if the booking has never moved.
+   * Drives "rescheduled" wording in the client/admin notifications. */
+  rescheduled_at?: string | null;
+  previous_start_time?: string | null;
   notes: string | null;
   tag: LeadTag | null;
   created_at: string;

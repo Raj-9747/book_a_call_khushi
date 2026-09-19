@@ -87,12 +87,19 @@ export interface ProfileFields {
   photo_url?: string | null;
   company_name?: string | null;
   company_logo_url?: string | null;
+  onboarding_dismissed_at?: string | null;
 }
 
 export async function updateProfileFields(id: string, fields: ProfileFields): Promise<void> {
   const supabase = createClient();
   const { error } = await supabase.from("admins").update(fields).eq("id", id);
   if (error) throw error;
+}
+
+/** Marks the first-visit setup popup as seen so it never reopens. Written
+ * to the admins row (not localStorage) so it holds across devices. */
+export async function dismissOnboarding(id: string): Promise<void> {
+  await updateProfileFields(id, { onboarding_dismissed_at: new Date().toISOString() });
 }
 
 /** Turns the stored public URL back into the object path inside the bucket,

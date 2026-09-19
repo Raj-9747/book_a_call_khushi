@@ -144,6 +144,13 @@ export async function approveReschedule(
       end_time: newEnd.toISOString(),
       google_event_id: null,
       meet_link: null,
+      // Marks this as a MOVE, not a first booking. Written in the same
+      // UPDATE as the new time so it's already on the DB-webhook record when
+      // the relay runs — that's what lets the emails/WhatsApp say "your
+      // meeting has been rescheduled to …" instead of "your booking is
+      // accepted". previous_start_time is the time it moved FROM.
+      rescheduled_at: new Date().toISOString(),
+      previous_start_time: request.booking.start_time,
       // Reopens the confirmation-email gate so the existing "new booking"
       // pipeline fires again for the new time — see function doc above.
       confirmation_sent: false,

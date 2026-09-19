@@ -680,3 +680,49 @@ If this bites in practice, the smallest fix is a delay — hold the client's cop
 
 - Fireflies seat concurrency if two admins run calls simultaneously
 - Whether a client should be able to opt out of the recording at booking time, or only the admin decides per event type
+
+
+---
+
+## 12. Phase 13 — First-run onboarding, reschedule-aware messages, meeting links
+
+Three usability gaps raised after the Phase 12 build.
+
+## 12.1 First-run onboarding
+
+A new admin landed on an Overview with no guidance, and — because `weekly_availability` defaults to `{}` — with **no bookable slots at all** until they found the availability page. Two surfaces, one set of steps:
+
+- **A popup on first visit**, closed for good once dismissed. The dismissal is `admins.onboarding_dismissed_at` (not localStorage) so it doesn't reappear on another device or browser.
+- **A "Getting started" card** on the Overview that stays until every step is genuinely done — the way back if the popup was skipped. It replaced the old standalone "Connect Google Calendar" banner, which is now step 1.
+
+Steps: connect Google Calendar → update profile → set availability → create first event type. Availability was added to the requested three because without it the event type has nothing to offer.
+
+**Every step is derived from real data, never from "the user clicked through it"**: calendar connected flag; any of headline/about/photo set; at least one enabled day in `weekly_availability` (only true after the form is saved, given the `{}` default); at least one `event_types` row. Clicking a step's button dismisses the popup (client-side navigation, so the write completes); the Google connect button does a full-page redirect, so it deliberately doesn't — the popup returns after OAuth showing the updated progress.
+
+## 12.2 Reschedule-aware notifications
+
+A reschedule reuses the exact confirmation pipeline as a first booking (`approveReschedule` re-opens `confirmation_sent`, the DB webhook fires again), so nothing downstream could tell the two apart — a client whose meeting had merely *moved* was told "Your booking is confirmed".
+
+`bookings.rescheduled_at` and `previous_start_time` are written **in the same UPDATE as the new time**, so they are already on the webhook record when `relay-booking-to-n8n` runs. The relay forwards `is_reschedule` plus the previous time (pre-formatted for both IST and the client's timezone), and the n8n workflow chooses wording from that:
+
+| | First booking | Rescheduled |
+|---|---|---|
+| Email subject | Booking accepted: … | Rescheduled: … |
+| Email headline | Your booking has been accepted ✅ | Your meeting has been rescheduled to **<time>** (previously ~~<old time>~~) |
+| WhatsApp | *accepted* template | *rescheduled* template |
+
+Chosen over inferring "reschedule" from timestamps or adding a status value: a status would ripple through every `status in (...)` filter in the app, whereas two nullable columns touch nothing else.
+
+## 12.3 Meeting link in WhatsApp and email
+
+- **Bug found while doing this:** the confirmation email read `$json.meet_link` from a node that sat *after* the "Update Booking" PATCH, which uses `Prefer: return=minimal` and so returns nothing — the email always fell through to "your host will share the link separately", even when a Meet link existed. The email and WhatsApp nodes now hang directly off the two Set nodes that carry `meet_link`.
+- The **1-hour reminder email** had no join link at all; it now includes the Meet link and a manage link.
+- WhatsApp: admin **and** client messages carry the link. This reverses the earlier "client WhatsApp for confirmation isn't needed" call (§11.2) — deliberately, since the link is exactly what someone needs on their phone without opening a dashboard. Booking-accepted vs rescheduled use separate templates (Meta rejects a variable that changes a message's whole meaning).
+- Where there is no Meet link (admin has no Google Calendar connected) the email says so plainly and WhatsApp substitutes a fallback string, since an empty template variable is rejected.
+
+**Not built:** a WhatsApp version of the 1-hour reminder. It's the moment the link matters most, but §11.2 explicitly kept reminders email-only and it needs another template — say the word if you want it.
+
+## 12.4 Setup notes
+
+- Run `0024` **before** deploying the frontend (see SETUP.md — the admin column list now includes `onboarding_dismissed_at`).
+- The four new WhatsApp templates share one variable layout per recipient, so a single node per recipient picks the template by expression rather than needing an IF + two nodes each. Their IDs are placeholders (`REPLACE_…`) in `create-booking-event.json` until the templates are approved; the WhatsApp nodes are set to continue on error, so a missing template can never block the email.
