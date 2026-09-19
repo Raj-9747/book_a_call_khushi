@@ -671,8 +671,8 @@ If this bites in practice, the smallest fix is a delay — hold the client's cop
 
 - Fireflies **paid plan with API access**, its API key, and a webhook secret
 - ~~Approved Zaple/Meta templates~~ — done, all three approved as Utility:
-  - Client MoM ready — `188758117891098742496888`
-  - Admin MoM ready — `126497717891099281990193`
+  - Client MoM ready — ~~`188758117891098742496888`~~ superseded 19 Sep by `zaptly_clients_mom` (`58540417898034473589315`)
+  - Admin MoM ready — ~~`126497717891099281990193`~~ superseded 19 Sep by `zaptly_admin_mom` (`284829217898033834031417`)
   - Client payment not completed — `272563817891100082631965`
 - Confirmation of the Fireflies notetaker address — `fred@fireflies.ai` at time of writing, worth re-checking against their current docs
 
@@ -720,9 +720,11 @@ Chosen over inferring "reschedule" from timestamps or adding a status value: a s
 - WhatsApp: admin **and** client messages carry the link. This reverses the earlier "client WhatsApp for confirmation isn't needed" call (§11.2) — deliberately, since the link is exactly what someone needs on their phone without opening a dashboard. Booking-accepted vs rescheduled use separate templates (Meta rejects a variable that changes a message's whole meaning).
 - Where there is no Meet link (admin has no Google Calendar connected) the email says so plainly and WhatsApp substitutes a fallback string, since an empty template variable is rejected.
 
-**Not built:** a WhatsApp version of the 1-hour reminder. It's the moment the link matters most, but §11.2 explicitly kept reminders email-only and it needs another template — say the word if you want it.
+**Also built:** a WhatsApp version of the 1-hour reminder (`zaptly_booking_reminder`), added once its template existed. It reverses the §11.2 "reminders stay email-only" call for the same reason as the confirmation — the reminder is the moment someone actually needs the link on their phone. It sits after the reminder email; the WhatsApp node is set to continue on error so a template problem can never stop `Mark Reminder Sent` (which would re-remind the same booking every 10-minute tick).
 
 ## 12.4 Setup notes
 
 - Run `0024` **before** deploying the frontend (see SETUP.md — the admin column list now includes `onboarding_dismissed_at`).
-- The four new WhatsApp templates share one variable layout per recipient, so a single node per recipient picks the template by expression rather than needing an IF + two nodes each. Their IDs are placeholders (`REPLACE_…`) in `create-booking-event.json` until the templates are approved; the WhatsApp nodes are set to continue on error, so a missing template can never block the email.
+- Template IDs (created 19 Sep, all wired): `zaptly_client_accepted` 36130941789803696391595 · `zaptly_client_rescheduled` 272006517898039483815948 · `zaptly_admin_booking` 322999617898041082465084 · `zaptly_admin_rescheduled` 210674917898041793438676 · `zaptly_booking_reminder` 128600217898032851295432. `zaptly_admin_booking` replaces the earlier admin "new booking" template (`85139317884571741379242`), which no longer appears in any workflow.
+- Accepted/rescheduled templates share one variable layout per recipient, so a single node per recipient picks the template by expression rather than an IF plus two nodes each. Client: name, session, admin, time, meeting link, manage link. Admin: name, session, client, time, meeting link. The reminder reuses the client layout.
+- The WhatsApp nodes continue on error, so a template problem can never block the email.

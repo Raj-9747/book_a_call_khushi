@@ -280,7 +280,7 @@ Full background in `PLAN.md` §12.
 87. From the magic link, request a reschedule; approve it in Requests → email subject **"Rescheduled: …"**, body "Your meeting has been rescheduled to <new time>" with the old time struck through, and the **new** Meet link (the old event is deleted, so the link changes).
 88. Book with an admin who has **no** Google Calendar connected → email says "Your host will share the meeting link with you separately" (no broken/empty link).
 89. Once the four WhatsApp templates are approved and their IDs pasted into the two WhatsApp nodes: the admin **and** the client each get a WhatsApp with the meeting link, and a reschedule uses the "rescheduled" template. A client with no phone gets email only.
-90. The 1-hour reminder email now includes the Meet link and a manage link.
+90. The 1-hour reminder now goes out by **email and WhatsApp**, both with the Meet link (and a manage link). Book a session ~1 hour ahead (or temporarily widen the window in `Compute Reminder Window`) to test it; a client with no phone gets the email only.
 
 ## Still to come (not needed yet, listed so nothing is a surprise later)
 
