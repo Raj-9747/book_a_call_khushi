@@ -147,7 +147,7 @@ export function ResolveRequestModal({
               <p className="mb-2 text-sm font-medium text-neutral-800">
                 {hasPreferredSlot ? "Or approve for a different time" : "New time"}
               </p>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-3 min-[400px]:grid-cols-2">
                 <FormField label="Date">
                   <DatePicker value={date} onChange={setDate} minDate={new Date()} />
                 </FormField>

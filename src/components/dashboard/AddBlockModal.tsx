@@ -90,7 +90,7 @@ export function AddBlockModal({
         </div>
 
         {!allDay && (
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 min-[400px]:grid-cols-2">
             <FormField label="Start time" htmlFor="block-start" error={errors.startTime?.message} required>
               <Controller
                 control={control}

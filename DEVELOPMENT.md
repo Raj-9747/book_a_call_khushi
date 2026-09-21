@@ -52,7 +52,8 @@ Because features share the auth/layout foundation, a change in one area can sile
 7. **The magic link → request → approval loop** — open a booking's `/booking/[token]` link, submit a reschedule request, approve it from `/dashboard/requests`, confirm the booking's time updates and a fresh confirmation email goes out.
 8. **Data isolation** — log in as a second admin and confirm they cannot see the first admin's bookings, event types, discount codes, or enquiries anywhere in the UI (this is the one category of bug that's easy to introduce silently in an RLS policy and easy to miss in normal testing, since it only shows up when you deliberately check as a *different* user).
 9. **Responsive check** — resize to ~375px width on at least the page you changed and one you didn't, confirm nothing overflows/clips.
-10. **Build check** — `npm run lint` and `npm run build` both pass clean before considering a change finished.
+10. **Phone check** — open any modal you added or touched at roughly **360×560** (a small phone, or landscape) and confirm you can scroll to its last button. `Modal` is capped to the visible viewport and scrolls its own body, so this only fails if something bypasses it. Also confirm no page scrolls sideways at 320px. (Headless Playwright with `isMobile: true` and `click({ trial: true })` on the last button is a quick automated way to check.)
+11. **Build check** — `npm run lint` and `npm run build` both pass clean before considering a change finished.
 
 A fuller, numbered manual test script lives in [SETUP.md](SETUP.md) (steps 1–64+) — this section is the fast subset to run after *any* change, not a replacement for it.
 

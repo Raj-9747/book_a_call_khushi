@@ -77,9 +77,12 @@ export function AppShell({
   }
 
   return (
-    // h-screen + overflow-hidden makes <main> the only scroll container, so
-    // the sidebar stays put instead of scrolling away with long pages.
-    <div className="flex h-screen overflow-hidden">
+    // A fixed height + overflow-hidden makes <main> the only scroll container,
+    // so the sidebar stays put instead of scrolling away with long pages.
+    // dvh, not vh: on phones 100vh is the viewport with the browser toolbar
+    // hidden, so the bottom of <main> (a page's last button) sat behind it.
+    // vh is kept as the fallback for engines without dvh.
+    <div className="flex h-screen overflow-hidden supports-[height:100dvh]:h-dvh">
       {/* Mobile top bar */}
       <div className="fixed inset-x-0 top-0 z-30 flex h-14 items-center gap-3 border-b border-sidebar-border bg-sidebar px-4 md:hidden">
         <button
