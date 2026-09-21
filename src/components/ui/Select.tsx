@@ -74,44 +74,60 @@ export function Select({
     return options.filter((o) => o.label.toLowerCase().includes(q) || o.value.toLowerCase().includes(q));
   }, [options, query]);
 
-  function openMenu() {
+  /** Where the list goes, measured from the trigger and the *visible* area.
+   * Pulled out of openMenu so it can be re-run when the on-screen keyboard
+   * changes how much of the screen is actually visible — otherwise the list
+   * ends up hidden behind the keyboard. */
+  function computePosition(): Position | null {
     const rect = triggerRef.current?.getBoundingClientRect();
-    if (!rect) {
-      setOpen(true);
-      return;
-    }
+    if (!rect) return null;
+
+    // visualViewport is the part of the page actually visible, which shrinks
+    // when a phone keyboard opens (iOS leaves innerHeight alone and overlays
+    // the keyboard). Fall back to the layout viewport where it's missing.
+    const vv = window.visualViewport;
+    const visibleTop = vv ? vv.offsetTop : 0;
+    const visibleBottom = vv ? vv.offsetTop + vv.height : window.innerHeight;
 
     const wanted = MAX_OPTIONS_HEIGHT + (showSearch ? SEARCH_ROW_HEIGHT : 0);
-    const spaceBelow = window.innerHeight - rect.bottom - VIEWPORT_MARGIN;
-    const spaceAbove = rect.top - VIEWPORT_MARGIN;
+    const spaceBelow = visibleBottom - rect.bottom - VIEWPORT_MARGIN;
+    const spaceAbove = rect.top - visibleTop - VIEWPORT_MARGIN;
 
     // Prefer opening downward. Only flip when there genuinely isn't room
     // below and flipping actually buys space — a short list plus this rule
     // means flipping is now rare rather than the default in a modal.
     const shouldFlip = spaceBelow < Math.min(wanted, 160) && spaceAbove > spaceBelow;
 
-    setPosition(
-      shouldFlip
-        ? {
-            bottom: window.innerHeight - rect.top + 4,
-            left: rect.left,
-            width: rect.width,
-            maxHeight: Math.max(Math.min(spaceAbove, wanted), 140),
-          }
-        : {
-            top: rect.bottom + 4,
-            left: rect.left,
-            width: rect.width,
-            maxHeight: Math.max(Math.min(spaceBelow, wanted), 140),
-          }
-    );
+    return shouldFlip
+      ? {
+          bottom: window.innerHeight - rect.top + 4,
+          left: rect.left,
+          width: rect.width,
+          maxHeight: Math.max(Math.min(spaceAbove, wanted), 140),
+        }
+      : {
+          top: rect.bottom + 4,
+          left: rect.left,
+          width: rect.width,
+          maxHeight: Math.max(Math.min(spaceBelow, wanted), 140),
+        };
+  }
+
+  function openMenu() {
+    setPosition(computePosition());
     setQuery("");
     setOpen(true);
   }
 
-  // Focus the filter box on open so you can just start typing.
+  // Focus the filter box on open so you can just start typing — but only with
+  // a physical keyboard. On a touch device focusing an input pops the
+  // on-screen keyboard, which was covering half the screen (and, before the
+  // handlers below learned to cope, closing the list) every time someone
+  // opened a short dropdown just to pick from it. They can still tap the
+  // search box if they do want to filter.
   useEffect(() => {
     if (!open || !showSearch) return;
+    if (window.matchMedia("(pointer: coarse)").matches) return;
     function focusSearch() {
       searchRef.current?.focus();
     }
@@ -126,24 +142,53 @@ export function Select({
       if (triggerRef.current?.contains(target) || listRef.current?.contains(target)) return;
       setOpen(false);
     }
+    // With the search box focused, a resize or scroll is the on-screen keyboard
+    // opening (the browser resizes the view and scrolls the field into sight)
+    // — not the user leaving. Closing here is what made the dropdown vanish
+    // the instant the keyboard appeared; instead, keep it and move it so it
+    // still sits in the part of the screen that's actually visible.
+    function searchHasFocus() {
+      return !!listRef.current?.contains(document.activeElement);
+    }
+    function reposition() {
+      const next = computePosition();
+      if (next) setPosition(next);
+    }
     function handleWindowScroll(e: Event) {
       // Scroll events don't bubble but DO fire during the capture phase —
       // ignore scrolls inside our own list (e.g. its own scrollIntoView).
       if (listRef.current?.contains(e.target as Node)) return;
+      if (searchHasFocus()) {
+        reposition();
+        return;
+      }
       setOpen(false);
     }
     function handleResize() {
+      if (searchHasFocus()) {
+        reposition();
+        return;
+      }
       setOpen(false);
+    }
+    // iOS overlays the keyboard without resizing the window, so it only shows
+    // up here.
+    function handleViewportResize() {
+      if (searchHasFocus()) reposition();
     }
 
     document.addEventListener("mousedown", handleClickOutside);
     window.addEventListener("scroll", handleWindowScroll, true);
     window.addEventListener("resize", handleResize);
+    window.visualViewport?.addEventListener("resize", handleViewportResize);
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
       window.removeEventListener("scroll", handleWindowScroll, true);
       window.removeEventListener("resize", handleResize);
+      window.visualViewport?.removeEventListener("resize", handleViewportResize);
     };
+    // computePosition only reads refs and props that can't change while open.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
   function choose(optionValue: string) {
