@@ -82,7 +82,7 @@ function StepRow({
 }) {
   const Icon = step.icon;
   return (
-    <li className="flex items-start gap-3 py-3">
+    <li className="flex flex-wrap items-start gap-x-3 gap-y-2 py-3">
       <span
         className={cn(
           "mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold",
@@ -104,7 +104,8 @@ function StepRow({
         {!step.done && <p className="mt-0.5 text-sm text-neutral-500">{step.description}</p>}
       </div>
       {!step.done && (
-        <div className="shrink-0">
+        // Under the text (indented past the number) below sm, beside it above.
+        <div className="w-full pl-10 sm:w-auto sm:shrink-0 sm:pl-0">
           {step.custom ??
             (step.href && (
               <Button variant="outline" size="sm" onClick={() => onNavigate(step.href!)}>
@@ -196,7 +197,7 @@ export function OnboardingGuide({
             <StepRow key={step.id} step={step} index={i} onNavigate={go} />
           ))}
         </ul>
-        <div className="mt-2 flex items-center justify-between gap-3 border-t border-border pt-4">
+        <div className="mt-2 flex flex-col-reverse gap-2 border-t border-border pt-4 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
           <p className="text-xs text-neutral-500">This checklist stays on your Overview until you&apos;re done.</p>
           <Button variant="ghost" onClick={close}>
             I&apos;ll do this later
