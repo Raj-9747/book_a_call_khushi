@@ -2,9 +2,9 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { formatInTimeZone } from "date-fns-tz";
-import { CalendarDays, Clock, Video } from "lucide-react";
+import { ArrowRight, CalendarDays, CheckCircle2, Clock, Video } from "lucide-react";
 import { toast } from "sonner";
-import { Button, Card, CardContent, Modal, Spinner } from "@/components/ui";
+import { Button, Modal, Spinner } from "@/components/ui";
 import { computeAvailableSlots } from "@/lib/availability/computeSlots";
 import {
   getBusyRanges,
@@ -17,7 +17,7 @@ import {
 import { openRazorpayCheckout } from "@/lib/payments/razorpay";
 import { toE164, type BookingDetailsValues } from "@/lib/validations/publicBooking";
 import { AdminProfileHeader } from "./AdminProfileHeader";
-import { DateSlotPicker } from "./DateSlotPicker";
+import { CalendarSlotPicker } from "./CalendarSlotPicker";
 import { BookingDetailsForm } from "./BookingDetailsForm";
 import { DiscountBox, type AppliedDiscount } from "./DiscountBox";
 import { ConfirmationCard } from "./ConfirmationCard";
@@ -185,57 +185,90 @@ export function BookingFlow({ admin, eventType }: { admin: PublicAdmin; eventTyp
 
   return (
     <>
-      <Card>
-        <CardContent className="space-y-5 py-6">
-          <AdminProfileHeader admin={admin} compact />
+      {/* Two panes on desktop, Calendly-style: what you're booking on the
+          left, when on the right. Stacks on mobile, summary first.
+          overflow-clip (not -hidden) rounds the corners without creating a
+          scroll container, which would break the sticky Continue bar. */}
+      <div className="overflow-clip rounded-[2rem] border border-border bg-surface shadow-md lg:grid lg:grid-cols-[360px_minmax(0,1fr)] xl:grid-cols-[420px_minmax(0,1fr)]">
+        <section className="relative border-b border-border bg-neutral-50 p-6 sm:p-8 lg:border-b-0 lg:border-r">
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-x-0 top-0 h-32 bg-[radial-gradient(80%_100%_at_0%_0%,var(--brand-100)_0%,transparent_70%)]"
+          />
+          <div className="relative space-y-6">
+            <AdminProfileHeader admin={admin} compact />
 
-          <div>
-            <h1 className="text-lg font-semibold text-neutral-900">{eventType.name}</h1>
-            <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
-              <span className="inline-flex items-center gap-1.5 text-neutral-500">
-                <Clock className="h-3.5 w-3.5" />
-                {eventType.duration_minutes} min
-              </span>
-              {isPaid ? (
-                <span className="flex items-center gap-1.5">
-                  {discount && (
-                    <span className="text-neutral-400 line-through">{formatAmount(eventType.price)}</span>
-                  )}
-                  <span className="font-semibold text-neutral-900">{formatAmount(total)}</span>
+            <div>
+              <h1 className="font-display text-3xl font-semibold leading-tight tracking-tight text-neutral-900 [font-variation-settings:'SOFT'_100]">
+                {eventType.name}
+              </h1>
+              <div className="mt-4 flex flex-wrap items-center gap-2 text-sm">
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface px-3 py-1 text-neutral-600">
+                  <Clock className="h-3.5 w-3.5" />
+                  {eventType.duration_minutes} min
                 </span>
-              ) : (
-                <span className="font-semibold text-neutral-900">Free</span>
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface px-3 py-1 text-neutral-600">
+                  <Video className="h-3.5 w-3.5" />
+                  Google Meet
+                </span>
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-neutral-900 px-3 py-1 text-surface">
+                  {isPaid && discount && (
+                    <span className="text-surface/60 line-through">{formatAmount(eventType.price)}</span>
+                  )}
+                  <span className="font-semibold">{isPaid ? formatAmount(total) : "Free"}</span>
+                </span>
+              </div>
+            </div>
+
+            {eventType.description && (
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-brand-600">About this session</p>
+                {/* whitespace-pre-line so the admin's own line breaks survive. */}
+                <p className="mt-2 whitespace-pre-line text-[15px] leading-relaxed text-neutral-700">
+                  {eventType.description}
+                </p>
+              </div>
+            )}
+
+            {/* Stated before booking, not discovered when a bot joins the
+                call — see PLAN.md §11.2 "Client consent". */}
+            {eventType.record_meeting && (
+              <div className="flex items-start gap-2.5 rounded-2xl border border-brand-200 bg-brand-50 px-4 py-3 text-sm text-brand-800">
+                <Video className="mt-0.5 h-4 w-4 shrink-0" />
+                <p>This session is recorded and you&apos;ll get a summary of what was discussed afterwards.</p>
+              </div>
+            )}
+
+            <ul className="space-y-2.5 border-t border-border pt-6 text-sm text-neutral-600">
+              <li className="flex items-start gap-2.5">
+                <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-brand-500" />
+                Instant confirmation with your Meet link
+              </li>
+              <li className="flex items-start gap-2.5">
+                <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-brand-500" />
+                A reminder an hour before the call
+              </li>
+              {isPaid && (
+                <li className="flex items-start gap-2.5">
+                  <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-brand-500" />
+                  Secure payment by UPI, card or netbanking
+                </li>
               )}
-            </div>
+            </ul>
           </div>
+        </section>
 
-          {eventType.description && (
-            <div className="rounded-lg bg-neutral-50 px-4 py-3">
-              <p className="text-xs font-medium uppercase tracking-wide text-neutral-500">About this session</p>
-              {/* whitespace-pre-line so the admin's own line breaks survive. */}
-              <p className="mt-1.5 whitespace-pre-line text-sm leading-relaxed text-neutral-700">
-                {eventType.description}
-              </p>
-            </div>
-          )}
+        <section className="flex flex-col p-6 sm:p-8">
+          <h2 className="font-display text-2xl font-semibold tracking-tight text-neutral-900">Pick a time</h2>
+          <p className="mt-1 text-sm text-neutral-500">Choose a date, then a slot that suits you.</p>
 
-          {/* Stated before booking, not discovered when a bot joins the
-              call — see PLAN.md §11.2 "Client consent". */}
-          {eventType.record_meeting && (
-            <div className="flex items-start gap-2 rounded-lg border border-brand-200 bg-brand-50 px-4 py-3 text-sm text-brand-800">
-              <Video className="mt-0.5 h-4 w-4 shrink-0" />
-              <p>This session is recorded and you&apos;ll get a summary of what was discussed afterwards.</p>
-            </div>
-          )}
-
-          <div className="border-t border-border pt-5">
-            <p className="mb-3 text-sm font-medium text-neutral-900">Pick a time</p>
+          <div className="mt-6 flex-1">
             {slots === null ? (
-              <div className="flex justify-center py-10">
+              <div className="flex justify-center py-16">
                 <Spinner className="h-6 w-6 text-neutral-400" />
               </div>
             ) : (
-              <DateSlotPicker
+              <CalendarSlotPicker
                 slots={slots}
                 visitorTimeZone={visitorTimeZone}
                 selectedSlot={selectedSlot}
@@ -245,7 +278,7 @@ export function BookingFlow({ admin, eventType }: { admin: PublicAdmin; eventTyp
           </div>
 
           {isPaid && (
-            <div className="border-t border-border pt-5">
+            <div className="mt-6 border-t border-border pt-5">
               <DiscountBox
                 adminSlug={admin.slug}
                 eventSlug={eventType.slug}
@@ -256,19 +289,29 @@ export function BookingFlow({ admin, eventType }: { admin: PublicAdmin; eventTyp
             </div>
           )}
 
-          <div className="border-t border-border pt-5">
-            {selectedSlot && (
-              <p className="mb-3 flex items-center gap-1.5 text-sm text-neutral-600">
-                <CalendarDays className="h-4 w-4 shrink-0 text-neutral-400" />
-                {formatInTimeZone(selectedSlot, visitorTimeZone, "EEEE, MMMM d 'at' h:mm a")}
+          {/* Pinned to the bottom of the screen on phones, where the slot
+              grid can push the button well below the fold. */}
+          <div className="sticky bottom-0 -mx-6 mt-6 border-t border-border bg-surface/95 px-6 py-4 backdrop-blur sm:-mx-8 sm:px-8 lg:static lg:mx-0 lg:bg-transparent lg:px-0 lg:pb-0 lg:backdrop-blur-none">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <p className="flex min-h-5 items-center gap-1.5 text-sm text-neutral-600">
+                <CalendarDays className="h-4 w-4 shrink-0 text-brand-500" />
+                {selectedSlot
+                  ? formatInTimeZone(selectedSlot, visitorTimeZone, "EEE, MMM d 'at' h:mm a")
+                  : "No time selected yet"}
               </p>
-            )}
-            <Button className="w-full" size="lg" disabled={!selectedSlot} onClick={() => setModalOpen(true)}>
-              {selectedSlot ? "Continue" : "Select a time to continue"}
-            </Button>
+              <Button
+                className="w-full rounded-full sm:w-auto sm:min-w-44"
+                size="lg"
+                disabled={!selectedSlot}
+                onClick={() => setModalOpen(true)}
+              >
+                {selectedSlot ? "Continue" : "Select a time"}
+                <ArrowRight className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
-        </CardContent>
-      </Card>
+        </section>
+      </div>
 
       <Modal
         open={modalOpen}
