@@ -16,7 +16,7 @@
 //
 // Then in the Razorpay dashboard (Account & Settings -> Webhooks) add this
 // function's URL, the same secret, and the events:
-//   payment.captured, payment.failed, refund.processed
+//   payment.captured, payment.failed, refund.created, refund.processed, refund.failed
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { corsHeaders, jsonResponse } from "../_shared/cors.ts";
@@ -112,27 +112,41 @@ Deno.serve(async (req) => {
       return jsonResponse({ received: true });
     }
 
-    if (eventName === "refund.processed") {
+    if (eventName === "refund.processed" || eventName === "refund.failed" || eventName === "refund.created") {
       const entity = event.payload?.refund?.entity ?? {};
-      if (entity.payment_id) {
+      if (entity.id && entity.payment_id) {
+        const status = eventName === "refund.processed" ? "processed" : eventName === "refund.failed" ? "failed" : "pending";
         const { data: booking } = await admin
           .from("bookings")
-          .select("id, amount_paid")
+          .select("id")
           .eq("razorpay_payment_id", entity.payment_id)
           .maybeSingle();
 
         if (booking) {
-          const refunded = entity.amount != null ? paiseToRupees(entity.amount) : 0;
-          const paid = Number(booking.amount_paid ?? 0);
-          await admin
-            .from("bookings")
-            .update({
-              refund_amount: refunded,
-              refund_status: "processed",
-              refunded_at: new Date().toISOString(),
-              payment_status: refunded >= paid && paid > 0 ? "refunded" : "partially_refunded",
-            })
-            .eq("id", booking.id);
+          // Upsert, not update: a refund made straight from the Razorpay
+          // dashboard has no ledger row yet and should still show up here.
+          // A late "created" must never downgrade an already-settled row.
+          const { data: existing } = await admin
+            .from("booking_refunds")
+            .select("status")
+            .eq("razorpay_refund_id", entity.id)
+            .maybeSingle();
+          if (!(existing && existing.status !== "pending" && status === "pending")) {
+            const { error } = await admin.from("booking_refunds").upsert(
+              {
+                booking_id: booking.id,
+                razorpay_refund_id: entity.id,
+                razorpay_payment_id: entity.payment_id,
+                amount: paiseToRupees(entity.amount ?? 0),
+                status,
+                processed_at: status === "processed" ? new Date().toISOString() : null,
+              },
+              { onConflict: "razorpay_refund_id" }
+            );
+            if (error) throw error;
+            const { error: syncError } = await admin.rpc("sync_booking_refund", { p_booking_id: booking.id });
+            if (syncError) throw syncError;
+          }
         }
       }
       return jsonResponse({ received: true });

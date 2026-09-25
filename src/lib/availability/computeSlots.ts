@@ -94,3 +94,18 @@ export function groupSlotsByDay(slots: Date[], timeZone: string): Map<string, Da
   }
   return grouped;
 }
+
+/** Drops the booking's OWN time from a busy list. When moving a booking, the
+ * slot it currently holds is about to be freed, so it must be offered again
+ * (and must not block adjacent options). Matches the booking's exact range,
+ * which also covers the Google Calendar event created for it. */
+export function withoutOwnBooking<T extends { start_time: string; end_time: string }>(
+  busyRanges: T[],
+  own: { start_time: string; end_time: string }
+): T[] {
+  const start = new Date(own.start_time).getTime();
+  const end = new Date(own.end_time).getTime();
+  return busyRanges.filter(
+    (b) => !(new Date(b.start_time).getTime() === start && new Date(b.end_time).getTime() === end)
+  );
+}

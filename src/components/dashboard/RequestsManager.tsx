@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { sentenceCase } from "@/lib/utils";
 import { useRouter } from "next/navigation";
 import { formatInTimeZone } from "date-fns-tz";
 import { CalendarClock, Inbox, XCircle } from "lucide-react";
@@ -110,7 +111,7 @@ function RequestRow({ request, onClick }: { request: ChangeRequestWithBooking; o
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
           <p className="font-medium text-neutral-900">{request.booking.client_name}</p>
-          <Badge tone={statusTone}>{request.status}</Badge>
+          <Badge tone={statusTone}>{sentenceCase(request.status)}</Badge>
         </div>
         <p className="mt-0.5 text-sm text-neutral-500">
           {request.type === "reschedule" ? "Reschedule" : "Cancellation"} · {request.booking.event_types?.name ?? "session"}

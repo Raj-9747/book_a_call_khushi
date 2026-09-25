@@ -286,3 +286,10 @@ Full background in `PLAN.md` §12.
 
 - ~~Zaple account/API key — WhatsApp confirmation/reminders (email via Gmail is built; WhatsApp isn't yet)~~ — done: the admin new-booking alert, the client/admin MoM messages, and the abandoned-payment nudge are all built. Booking confirmation and the 1-hour reminder are a deliberate exception — staying email-only, see `PLAN.md` §11.2
 - A domain, once we're ready to deploy beyond `localhost` (also needs adding to the Google OAuth redirect URIs)
+
+## Refund ledger, admin reschedule/cancel (Phase 14)
+
+91. Run `supabase/migrations/0025_booking_refunds.sql` in the SQL editor. Then redeploy `refund-razorpay-payment` and `razorpay-webhook` (already done from the CLI on 25 Sep).
+92. Razorpay Dashboard → Webhooks → your webhook → also tick **refund.created** and **refund.failed** (refund.processed is already on). Make sure the Razorpay keys in Supabase secrets are from the **same mode (Test/Live)** as the dashboard you're checking.
+93. Test: cancel a paid booking from Bookings → choose Full. The toast should say the refund started; Razorpay → Refunds must now show it (its `rfnd_…` id is in the `booking_refunds` table). Payments shows "refund pending" until Razorpay confirms.
+94. Test: Bookings → ⋯ → Reschedule on a confirmed booking; the client should get the "rescheduled" email/WhatsApp and a new Meet link.

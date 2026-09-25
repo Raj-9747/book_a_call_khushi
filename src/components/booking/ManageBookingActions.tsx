@@ -1,12 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { sentenceCase } from "@/lib/utils";
 import { useRouter } from "next/navigation";
 import { formatInTimeZone } from "date-fns-tz";
 import { CalendarClock, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import { Badge, Button, FormField, Modal, Spinner, Textarea } from "@/components/ui";
-import { computeAvailableSlots } from "@/lib/availability/computeSlots";
+import { computeAvailableSlots, withoutOwnBooking } from "@/lib/availability/computeSlots";
 import { getBusyRanges, getGoogleBusyRanges } from "@/lib/api/publicBooking";
 import { createChangeRequest, type ManagedBooking } from "@/lib/api/manageBooking";
 import { DateSlotPicker } from "./DateSlotPicker";
@@ -49,7 +50,10 @@ export function ManageBookingActions({ booking, token }: { booking: ManagedBooki
           computeAvailableSlots({
             weeklyAvailability: booking.admin_weekly_availability,
             durationMinutes: booking.duration_minutes,
-            busyRanges: [...zaptlyBusy, ...googleBusy],
+            busyRanges: withoutOwnBooking([...zaptlyBusy, ...googleBusy], {
+              start_time: booking.start_time,
+              end_time: booking.end_time,
+            }),
             daysAhead: booking.admin_booking_window_days,
             minNoticeMinutes: booking.admin_min_notice_minutes,
           })
@@ -69,6 +73,8 @@ export function ManageBookingActions({ booking, token }: { booking: ManagedBooki
     booking.admin_weekly_availability,
     booking.admin_google_calendar_connected,
     booking.duration_minutes,
+    booking.start_time,
+    booking.end_time,
     booking.admin_booking_window_days,
     booking.admin_min_notice_minutes,
   ]);
@@ -127,9 +133,9 @@ export function ManageBookingActions({ booking, token }: { booking: ManagedBooki
       <div className="flex items-start gap-2.5 rounded-lg border border-border bg-neutral-50 px-4 py-3 text-sm text-neutral-600">
         <Badge
           tone={booking.request_status === "approved" ? "success" : booking.request_status === "rejected" ? "danger" : "brand"}
-          className="shrink-0 capitalize"
+          className="shrink-0"
         >
-          {booking.request_status}
+          {sentenceCase(booking.request_status)}
         </Badge>
         <span>{label}</span>
       </div>

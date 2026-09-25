@@ -123,6 +123,11 @@ export interface Booking {
   discount_percent: number | null;
   amount_due: number | null;
   currency: string;
+  /** Money actually captured / confirmed refunded (settled by Razorpay). */
+  amount_paid?: number | null;
+  refund_amount?: number | null;
+  refund_status?: string | null;
+  razorpay_payment_id?: string | null;
   google_event_id: string | null;
   meet_link: string | null;
   reminder_sent: boolean;
