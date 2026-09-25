@@ -3,12 +3,14 @@
 import { useEffect, useState } from "react";
 import { Controller, useFieldArray, useForm, useWatch, type Control, type FieldErrors, type UseFormRegister } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Plus, Trash2 } from "lucide-react";
+import { Download, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Modal, Button, Checkbox, FormField, Input, Textarea, Select, Switch } from "@/components/ui";
 import { eventTypeFormSchema, type EventTypeFormInput, type EventTypeFormValues } from "@/lib/validations/eventType";
 import { createEventType, updateEventType } from "@/lib/api/eventTypes";
-import type { EventType } from "@/types/models";
+import type { CustomQuestion, EventType } from "@/types/models";
+
+const MAX_QUESTIONS = 10;
 
 function emptyQuestion() {
   return {
@@ -106,12 +108,15 @@ export function EventTypeFormModal({
   open,
   adminId,
   eventType,
+  otherEventTypes = [],
   onClose,
   onSaved,
 }: {
   open: boolean;
   adminId: string;
   eventType: EventType | null;
+  /** The admin's other events — the source list for "Import questions". */
+  otherEventTypes?: EventType[];
   onClose: () => void;
   onSaved: (eventType: EventType) => void;
 }) {
@@ -130,6 +135,43 @@ export function EventTypeFormModal({
   });
 
   const { fields, append, remove } = useFieldArray({ control, name: "custom_questions" });
+  const [importOpen, setImportOpen] = useState(false);
+  // Keyed `${eventId}:${questionId}` so the same question id in two events
+  // (after an earlier import) can't be ticked as one.
+  const [picked, setPicked] = useState<Set<string>>(new Set());
+  const currentLabels = useWatch({ control, name: "custom_questions" });
+
+  const importable = otherEventTypes.filter((et) => et.id !== eventType?.id && et.custom_questions.length > 0);
+  const takenLabels = new Set((currentLabels ?? []).map((q) => (q?.label ?? "").trim().toLowerCase()));
+  const room = MAX_QUESTIONS - fields.length;
+
+  function togglePick(key: string) {
+    setPicked((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }
+
+  function importPicked() {
+    const chosen: CustomQuestion[] = [];
+    for (const et of importable) {
+      for (const q of et.custom_questions) {
+        if (picked.has(`${et.id}:${q.id}`)) chosen.push(q);
+      }
+    }
+    const toAdd = chosen.slice(0, room);
+    for (const q of toAdd) {
+      // Fresh id: the copy must be independent of the source question, so
+      // editing one event's answers never touches the other's.
+      append({ id: crypto.randomUUID(), label: q.label, type: q.type, required: q.required, optionsText: (q.options ?? []).join(", ") });
+    }
+    if (chosen.length > toAdd.length) toast.info(`Only ${MAX_QUESTIONS} questions fit — imported ${toAdd.length}.`);
+    else toast.success(`Imported ${toAdd.length} question${toAdd.length === 1 ? "" : "s"}`);
+    setPicked(new Set());
+    setImportOpen(false);
+  }
 
   useEffect(() => {
     if (open) reset(toFormValues(eventType));
@@ -205,16 +247,69 @@ export function EventTypeFormModal({
           <div>
             <div className="mb-2 flex items-center justify-between">
               <p className="text-sm font-medium text-neutral-700">Custom questions</p>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={fields.length >= 10}
-                onClick={() => append(emptyQuestion())}
-              >
-                <Plus className="h-3.5 w-3.5" /> Add question
-              </Button>
+              <div className="flex gap-2">
+                {importable.length > 0 && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={room <= 0}
+                    onClick={() => setImportOpen((v) => !v)}
+                  >
+                    <Download className="h-3.5 w-3.5" /> Import
+                  </Button>
+                )}
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={fields.length >= MAX_QUESTIONS}
+                  onClick={() => append(emptyQuestion())}
+                >
+                  <Plus className="h-3.5 w-3.5" /> Add question
+                </Button>
+              </div>
             </div>
+
+            {importOpen && (
+              <div className="mb-3 space-y-3 rounded-lg border border-border bg-neutral-50 p-3">
+                <p className="text-xs text-neutral-500">
+                  Tick the questions to copy into this event. Copies are independent, and ones you already have are
+                  skipped. {room} slot{room === 1 ? "" : "s"} left.
+                </p>
+                <div className="max-h-56 space-y-3 overflow-y-auto">
+                  {importable.map((et) => (
+                    <div key={et.id}>
+                      <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-neutral-500">{et.name}</p>
+                      <div className="space-y-1.5">
+                        {et.custom_questions.map((q) => {
+                          const dup = takenLabels.has(q.label.trim().toLowerCase());
+                          const key = `${et.id}:${q.id}`;
+                          return (
+                            <div key={q.id} className={dup ? "flex items-center gap-2 opacity-50" : "flex items-center gap-2"}>
+                              <Checkbox checked={picked.has(key)} disabled={dup} onChange={() => togglePick(key)} label={q.label} />
+                              <span className="text-xs text-neutral-400">
+                                {q.type}
+                                {q.required ? " · required" : ""}
+                                {dup ? " · already added" : ""}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div className="flex justify-end gap-2">
+                  <Button type="button" variant="ghost" size="sm" onClick={() => setImportOpen(false)}>
+                    Close
+                  </Button>
+                  <Button type="button" size="sm" disabled={picked.size === 0} onClick={importPicked}>
+                    Import {picked.size || ""}
+                  </Button>
+                </div>
+              </div>
+            )}
 
             {fields.length === 0 && (
               <p className="rounded-md border border-dashed border-border-strong px-3 py-4 text-center text-sm text-neutral-400">

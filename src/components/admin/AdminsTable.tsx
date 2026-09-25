@@ -71,6 +71,7 @@ export function AdminsTable({
       <table className="w-full min-w-[720px] text-sm">
         <thead>
           <tr className="border-b border-border bg-neutral-50 text-left text-xs font-medium uppercase tracking-wide text-neutral-500">
+            <th className="w-12 px-4 py-3">#</th>
             <th className="px-6 py-3">Admin</th>
             <th className="px-6 py-3">Booking link</th>
             <th className="px-6 py-3">Calendar</th>
@@ -79,8 +80,9 @@ export function AdminsTable({
           </tr>
         </thead>
         <tbody>
-          {pageItems.map((admin) => (
+          {pageItems.map((admin, index) => (
             <tr key={admin.id} className="border-b border-border last:border-0">
+              <td className="px-4 py-3.5 text-neutral-400">{(page - 1) * pageSize + index + 1}</td>
               <td className="px-6 py-3.5">
                 <div className="flex items-center gap-3">
                   <Avatar name={admin.name} />

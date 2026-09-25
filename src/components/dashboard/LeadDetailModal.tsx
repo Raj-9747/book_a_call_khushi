@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { sentenceCase } from "@/lib/utils";
 import { formatInTimeZone } from "date-fns-tz";
 import { FileDown, FileText, Sparkles } from "lucide-react";
 import { toast } from "sonner";
@@ -100,7 +101,7 @@ export function LeadDetailModal({
           <div className="min-w-0">
             <p className="text-neutral-400">Status</p>
             <Badge tone={booking.status === "cancelled" ? "danger" : booking.status === "completed" ? "success" : "brand"}>
-              {booking.status.replace("_", " ")}
+              {sentenceCase(booking.status)}
             </Badge>
           </div>
         </div>

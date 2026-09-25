@@ -2,12 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { formatInTimeZone } from "date-fns-tz";
-import { CheckCircle2, Search, XCircle } from "lucide-react";
+import { CalendarClock, CheckCircle2, Search, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/layout/PageHeader";
-import { ActionsMenu, Badge, Input, Pagination, Select, Spinner, useConfirm } from "@/components/ui";
+import { ActionsMenu, Badge, Input, Pagination, Select, Spinner } from "@/components/ui";
 import {
-  cancelBooking,
   listBookings,
   markBookingCompleted,
   type BookingSortField,
@@ -15,8 +14,9 @@ import {
 } from "@/lib/api/bookings";
 import { listEventTypes } from "@/lib/api/eventTypes";
 import { listPendingRequestTypesByBooking, type ChangeRequestType } from "@/lib/api/changeRequests";
-import { cn } from "@/lib/utils";
+import { cn, sentenceCase } from "@/lib/utils";
 import type { EventType } from "@/types/models";
+import { CancelBookingModal, RescheduleBookingModal } from "./BookingActionModals";
 import { EnquiriesTable } from "./EnquiriesTable";
 import { LeadDetailModal } from "./LeadDetailModal";
 
@@ -55,8 +55,8 @@ function statusTone(status: string): "brand" | "success" | "warning" | "danger" 
 /** `pending_payment` is a live hold, not a booking the admin should act on
  * — and `expired` is one that lapsed. Neither reads well as the raw enum. */
 function statusLabel(status: string): string {
-  if (status === "pending_payment") return "awaiting payment";
-  return status.replace("_", " ");
+  if (status === "pending_payment") return "Awaiting payment";
+  return sentenceCase(status);
 }
 
 export function BookingsManager({ adminId }: { adminId: string }) {
@@ -65,6 +65,8 @@ export function BookingsManager({ adminId }: { adminId: string }) {
   const [eventTypes, setEventTypes] = useState<EventType[]>([]);
   const [selected, setSelected] = useState<BookingWithEventType | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [cancelTarget, setCancelTarget] = useState<BookingWithEventType | null>(null);
+  const [rescheduleTarget, setRescheduleTarget] = useState<BookingWithEventType | null>(null);
 
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState(""); // debounced value actually sent to the query
@@ -75,7 +77,6 @@ export function BookingsManager({ adminId }: { adminId: string }) {
 
   const [tab, setTab] = useState<Tab>("bookings");
   const [pendingRequests, setPendingRequests] = useState<Map<string, ChangeRequestType>>(new Map());
-  const confirm = useConfirm();
 
   // Debounce the search box — only the pause after typing triggers a query.
   // Resets to page 1 in the same beat: staying on, say, page 4 of a
@@ -151,18 +152,12 @@ export function BookingsManager({ adminId }: { adminId: string }) {
 
   const hasActiveFilters = search.trim() !== "" || statusFilter !== "all" || eventTypeFilter !== "all";
 
-  async function handleCancel(booking: BookingWithEventType) {
-    if (!(await confirm({ description: `Cancel the booking with ${booking.client_name}?`, tone: "danger" }))) return;
-    setBusyId(booking.id);
-    try {
-      await cancelBooking(booking.id);
-      setBookings((prev) => (prev ? prev.map((b) => (b.id === booking.id ? { ...b, status: "cancelled" } : b)) : prev));
-      toast.success("Booking cancelled");
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to cancel booking");
-    } finally {
-      setBusyId(null);
+  function handleReschedule(booking: BookingWithEventType) {
+    if (pendingRequests.has(booking.id)) {
+      toast.error("This booking has a pending client request — resolve it from Requests first.");
+      return;
     }
+    setRescheduleTarget(booking);
   }
 
   async function handleComplete(booking: BookingWithEventType) {
@@ -241,9 +236,10 @@ export function BookingsManager({ adminId }: { adminId: string }) {
             ) : (
               <div className="overflow-hidden rounded-xl border border-border bg-surface">
                 <div className="overflow-x-auto">
-                  <table className="w-full min-w-[720px] text-sm">
+                  <table className="w-full min-w-[760px] text-sm">
                     <thead>
                       <tr className="border-b border-border bg-neutral-50 text-left text-xs font-medium uppercase tracking-wide text-neutral-500">
+                        <th className="w-12 px-4 py-3">#</th>
                         <th className="px-6 py-3">Client</th>
                         <th className="px-6 py-3">Event</th>
                         <th className="px-6 py-3">When</th>
@@ -254,8 +250,11 @@ export function BookingsManager({ adminId }: { adminId: string }) {
                       </tr>
                     </thead>
                     <tbody>
-                      {bookings.map((booking) => (
+                      {bookings.map((booking, index) => (
                         <tr key={booking.id} className="cursor-pointer border-b border-border last:border-0 hover:bg-neutral-50">
+                          <td className="px-4 py-3.5 text-neutral-400" onClick={() => setSelected(booking)}>
+                            {(page - 1) * PAGE_SIZE + index + 1}
+                          </td>
                           <td className="px-6 py-3.5" onClick={() => setSelected(booking)}>
                             <p className="font-medium text-neutral-900">{booking.client_name}</p>
                             <p className="text-xs text-neutral-500">{booking.client_email}</p>
@@ -305,7 +304,10 @@ export function BookingsManager({ adminId }: { adminId: string }) {
                                 disabled={busyId === booking.id}
                                 items={[
                                   { label: "Mark completed", icon: CheckCircle2, onClick: () => handleComplete(booking) },
-                                  { label: "Cancel booking", icon: XCircle, tone: "danger", onClick: () => handleCancel(booking) },
+                                  ...(booking.status === "confirmed"
+                                    ? [{ label: "Reschedule", icon: CalendarClock, onClick: () => handleReschedule(booking) }]
+                                    : []),
+                                  { label: "Cancel booking", icon: XCircle, tone: "danger", onClick: () => setCancelTarget(booking) },
                                 ]}
                               />
                             )}
@@ -321,6 +323,25 @@ export function BookingsManager({ adminId }: { adminId: string }) {
           </>
         )}
       </div>
+
+      <CancelBookingModal
+        key={`cancel-${cancelTarget?.id ?? "none"}`}
+        booking={cancelTarget}
+        onClose={() => setCancelTarget(null)}
+        onCancelled={(id) =>
+          setBookings((prev) => (prev ? prev.map((b) => (b.id === id ? { ...b, status: "cancelled" } : b)) : prev))
+        }
+      />
+      <RescheduleBookingModal
+        key={`resched-${rescheduleTarget?.id ?? "none"}`}
+        booking={rescheduleTarget}
+        onClose={() => setRescheduleTarget(null)}
+        onRescheduled={(id, start, end) =>
+          setBookings((prev) =>
+            prev ? prev.map((b) => (b.id === id ? { ...b, start_time: start, end_time: end } : b)) : prev
+          )
+        }
+      />
 
       <LeadDetailModal
         // Remount per booking. The modal seeds its notes/tag state from

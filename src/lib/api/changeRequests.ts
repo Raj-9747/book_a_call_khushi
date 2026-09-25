@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/client";
+import { moveBooking } from "@/lib/api/bookings";
 
 export type ChangeRequestType = "reschedule" | "cancel";
 export type ChangeRequestStatus = "pending" | "approved" | "rejected";
@@ -14,6 +15,7 @@ export interface ChangeRequestWithBooking {
   resolved_at: string | null;
   booking: {
     id: string;
+    admin_id: string;
     client_name: string;
     client_email: string;
     start_time: string;
@@ -91,72 +93,19 @@ export async function rejectChangeRequest(requestId: string, adminNote: string |
   if (error) throw error;
 }
 
-/** Approves a reschedule request. Re-validates the proposed slot for real
- * (it was only a proposal when the client submitted it — availability,
- * notice and the booking window may all have shifted since), then:
- * removes the old Google Calendar event, updates the booking to the new
- * time, and clears `confirmation_sent` so the same DB-webhook pipeline
- * that fired on the original booking fires again — creating a fresh
- * Calendar event and re-sending the confirmation email with the new time.
- * No new n8n workflow needed; this reuses the existing one. */
+/** Approves a reschedule request: moves the booking (see `moveBooking` for
+ * the validation and notification pipeline), then closes the request. */
 export async function approveReschedule(
   request: ChangeRequestWithBooking,
   newStart: Date
 ): Promise<void> {
   const supabase = createClient();
-  const durationMinutes = request.booking.event_types?.duration_minutes ?? 30;
-  const newEnd = new Date(newStart.getTime() + durationMinutes * 60_000);
-
-  // Conflict check against the admin's OWN other bookings/blocks. RLS
-  // already scopes both tables to the caller's own admin_id, so this can
-  // run as a plain authenticated read — no service role needed.
-  const [{ data: conflictingBookings }, { data: conflictingBlocks }] = await Promise.all([
-    supabase
-      .from("bookings")
-      .select("id")
-      .neq("id", request.booking.id)
-      .in("status", ["confirmed", "pending_confirmation"])
-      .lt("start_time", newEnd.toISOString())
-      .gt("end_time", newStart.toISOString()),
-    supabase
-      .from("blocked_slots")
-      .select("id")
-      .lt("start_time", newEnd.toISOString())
-      .gt("end_time", newStart.toISOString()),
-  ]);
-
-  if ((conflictingBookings?.length ?? 0) > 0 || (conflictingBlocks?.length ?? 0) > 0) {
-    throw new Error("That time is no longer free — pick a different slot before approving.");
-  }
-
-  // Best-effort — remove the stale Calendar event for the OLD time before
-  // the booking moves. Never blocks the reschedule itself.
-  try {
-    await supabase.functions.invoke("delete-booking-calendar-event", { body: { booking_id: request.booking.id } });
-  } catch {
-    /* best-effort */
-  }
-
-  const { error } = await supabase
-    .from("bookings")
-    .update({
-      start_time: newStart.toISOString(),
-      end_time: newEnd.toISOString(),
-      google_event_id: null,
-      meet_link: null,
-      // Marks this as a MOVE, not a first booking. Written in the same
-      // UPDATE as the new time so it's already on the DB-webhook record when
-      // the relay runs — that's what lets the emails/WhatsApp say "your
-      // meeting has been rescheduled to …" instead of "your booking is
-      // accepted". previous_start_time is the time it moved FROM.
-      rescheduled_at: new Date().toISOString(),
-      previous_start_time: request.booking.start_time,
-      // Reopens the confirmation-email gate so the existing "new booking"
-      // pipeline fires again for the new time — see function doc above.
-      confirmation_sent: false,
-    })
-    .eq("id", request.booking.id);
-  if (error) throw error;
+  await moveBooking({
+    bookingId: request.booking.id,
+    currentStart: request.booking.start_time,
+    durationMinutes: request.booking.event_types?.duration_minutes ?? 30,
+    newStart,
+  });
 
   const { error: requestError } = await supabase
     .from("booking_change_requests")
@@ -166,26 +115,22 @@ export async function approveReschedule(
 }
 
 /** Approves a cancellation. `refundAmount` of 0 skips Razorpay entirely —
- * the refund decision is the admin's alone, and "none" is a valid answer. */
+ * the refund decision is the admin's alone, and "none" is a valid answer.
+ * A refund goes first: if Razorpay refuses, nothing is cancelled. */
 export async function approveCancellation(
   request: ChangeRequestWithBooking,
   refundAmount: number
 ): Promise<void> {
   const supabase = createClient();
 
-  try {
-    await supabase.functions.invoke("delete-booking-calendar-event", { body: { booking_id: request.booking.id } });
-  } catch {
-    /* best-effort */
-  }
-
   if (refundAmount > 0) {
-    // Needs the Razorpay secret — the one part of this flow that can't be
-    // a plain RLS-guarded table write.
     const { data, error } = await supabase.functions.invoke("refund-razorpay-payment", {
-      body: { booking_id: request.booking.id, amount: refundAmount, request_id: request.id },
+      body: { booking_id: request.booking.id, amount: refundAmount, request_id: request.id, reason: "Client cancellation request" },
     });
-    if (error) throw error;
+    if (error) {
+      const body = await (error as { context?: Response }).context?.json?.().catch(() => null);
+      throw new Error(body?.error ?? error.message);
+    }
     if (data?.error) throw new Error(data.error);
   } else {
     const { error: requestError } = await supabase
@@ -193,6 +138,12 @@ export async function approveCancellation(
       .update({ status: "approved", resolved_at: new Date().toISOString() })
       .eq("id", request.id);
     if (requestError) throw requestError;
+  }
+
+  try {
+    await supabase.functions.invoke("delete-booking-calendar-event", { body: { booking_id: request.booking.id } });
+  } catch {
+    /* best-effort */
   }
 
   const { error } = await supabase

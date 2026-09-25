@@ -122,18 +122,34 @@ export async function fetchRazorpayPayment(paymentId: string): Promise<RazorpayP
   return (await response.json()) as RazorpayPayment;
 }
 
-export async function refundRazorpayPayment(paymentId: string, amountInPaise: number) {
+export interface RazorpayRefund {
+  id: string;
+  payment_id: string;
+  amount: number;
+  status: string; // "pending" | "processed" | "failed"
+}
+
+/** Thrown with Razorpay's own description so the admin sees WHY it refused
+ * ("payment not captured", "refund amount exceeds…") instead of a generic
+ * failure. */
+export class RazorpayError extends Error {}
+
+export async function refundRazorpayPayment(
+  paymentId: string,
+  amountInPaise: number,
+  notes: Record<string, string> = {}
+): Promise<RazorpayRefund> {
   const response = await fetch(`https://api.razorpay.com/v1/payments/${paymentId}/refund`, {
     method: "POST",
     headers: {
       Authorization: `Basic ${btoa(`${RAZORPAY_KEY_ID}:${RAZORPAY_KEY_SECRET}`)}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ amount: amountInPaise, speed: "normal" }),
+    body: JSON.stringify({ amount: amountInPaise, speed: "normal", notes }),
   });
+  const body = await response.json().catch(() => null);
   if (!response.ok) {
-    const body = await response.text();
-    throw new Error(`Razorpay refund failed (${response.status}): ${body}`);
+    throw new RazorpayError(body?.error?.description ?? `Razorpay refund failed (${response.status})`);
   }
-  return await response.json();
+  return body as RazorpayRefund;
 }

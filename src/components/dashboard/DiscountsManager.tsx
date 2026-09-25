@@ -200,6 +200,7 @@ export function DiscountsManager({ adminId }: { adminId: string }) {
               <table className="w-full min-w-[760px] text-sm">
                 <thead>
                   <tr className="border-b border-border bg-neutral-50 text-left text-xs font-medium uppercase tracking-wide text-neutral-500">
+                    <th className="w-12 px-4 py-3">#</th>
                     <th className="px-6 py-3">Code</th>
                     <th className="px-6 py-3">Applies to</th>
                     <th className="px-6 py-3">Expires</th>
@@ -209,7 +210,7 @@ export function DiscountsManager({ adminId }: { adminId: string }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {pageItems.map((code) => {
+                  {pageItems.map((code, index) => {
                     const status = health(code);
                     const scope = code.applies_to_all
                       ? "All sessions"
@@ -219,6 +220,7 @@ export function DiscountsManager({ adminId }: { adminId: string }) {
                           .join(", ") || "—";
                     return (
                       <tr key={code.id} className="border-b border-border last:border-0 hover:bg-neutral-50">
+                        <td className="px-4 py-3.5 text-neutral-400">{(page - 1) * pageSize + index + 1}</td>
                         <td className="px-6 py-3.5">
                           <p className="font-mono font-semibold tracking-wide text-neutral-900">{code.code}</p>
                           <p className="text-xs text-neutral-500">{code.percent}% off</p>

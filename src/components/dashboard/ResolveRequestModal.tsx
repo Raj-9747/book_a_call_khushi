@@ -1,9 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { fromZonedTime, formatInTimeZone } from "date-fns-tz";
+import { formatInTimeZone } from "date-fns-tz";
 import { toast } from "sonner";
-import { Button, DatePicker, FormField, Input, Modal, TimeInput } from "@/components/ui";
+import { Button, FormField, Input, Modal } from "@/components/ui";
+import { AdminSlotPicker } from "./AdminSlotPicker";
 import {
   approveCancellation,
   approveReschedule,
@@ -28,8 +29,7 @@ export function ResolveRequestModal({
   onClose: () => void;
   onResolved: (requestId: string) => void;
 }) {
-  const [date, setDate] = useState("");
-  const [time, setTime] = useState("10:00");
+  const [slot, setSlot] = useState<Date | null>(null);
   const [refundChoice, setRefundChoice] = useState<RefundChoice>("none");
   const [partialAmount, setPartialAmount] = useState("");
   const [adminNote, setAdminNote] = useState("");
@@ -43,8 +43,7 @@ export function ResolveRequestModal({
   const hasPreferredSlot = !!request.preferred_start_time;
 
   function resetAndClose() {
-    setDate("");
-    setTime("10:00");
+    setSlot(null);
     setRefundChoice("none");
     setPartialAmount("");
     setAdminNote("");
@@ -66,12 +65,10 @@ export function ResolveRequestModal({
   }
 
   async function handleApproveReschedule(useCustomTime: boolean) {
-    const newStart = useCustomTime
-      ? fromZonedTime(`${date}T${time}:00`, IST)
-      : new Date(request!.preferred_start_time!);
+    const newStart = useCustomTime ? slot : new Date(request!.preferred_start_time!);
 
-    if (useCustomTime && (!date || Number.isNaN(newStart.getTime()))) {
-      toast.error("Pick a date and time first");
+    if (!newStart) {
+      toast.error("Pick a time first");
       return;
     }
 
@@ -147,18 +144,21 @@ export function ResolveRequestModal({
               <p className="mb-2 text-sm font-medium text-neutral-800">
                 {hasPreferredSlot ? "Or approve for a different time" : "New time"}
               </p>
-              <div className="grid grid-cols-1 gap-3 min-[400px]:grid-cols-2">
-                <FormField label="Date">
-                  <DatePicker value={date} onChange={setDate} minDate={new Date()} />
-                </FormField>
-                <FormField label="Time (IST)">
-                  <TimeInput value={time} onChange={setTime} />
-                </FormField>
-              </div>
+              <AdminSlotPicker
+                adminId={request.booking.admin_id}
+                booking={{
+                  start_time: request.booking.start_time,
+                  end_time: request.booking.end_time,
+                  duration_minutes: request.booking.event_types?.duration_minutes ?? 30,
+                }}
+                selected={slot}
+                onSelect={setSlot}
+              />
               <Button
                 className="mt-3 w-full"
                 variant="outline"
                 isLoading={busy === "approve"}
+                disabled={!slot}
                 onClick={() => handleApproveReschedule(true)}
               >
                 Approve for this time

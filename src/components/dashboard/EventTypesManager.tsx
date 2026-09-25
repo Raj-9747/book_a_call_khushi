@@ -102,6 +102,7 @@ export function EventTypesManager({ adminId, adminSlug }: { adminId: string; adm
         open={formOpen}
         adminId={adminId}
         eventType={editTarget}
+        otherEventTypes={eventTypes ?? []}
         onClose={() => setFormOpen(false)}
         onSaved={(saved) =>
           setEventTypes((prev) =>

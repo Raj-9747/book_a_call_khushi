@@ -673,7 +673,7 @@ If this bites in practice, the smallest fix is a delay — hold the client's cop
 - ~~Approved Zaple/Meta templates~~ — done, all three approved as Utility:
   - Client MoM ready — ~~`188758117891098742496888`~~ superseded 19 Sep by `zaptly_clients_mom` (`58540417898034473589315`)
   - Admin MoM ready — ~~`126497717891099281990193`~~ superseded 19 Sep by `zaptly_admin_mom` (`284829217898033834031417`)
-  - Client payment not completed — `272563817891100082631965`
+  - Client payment not completed — `45094901790323521758464`
 - Confirmation of the Fireflies notetaker address — `fred@fireflies.ai` at time of writing, worth re-checking against their current docs
 
 ## 11.9 Open
@@ -728,3 +728,14 @@ Chosen over inferring "reschedule" from timestamps or adding a status value: a s
 - Template IDs (created 19 Sep, all wired): `zaptly_client_accepted` 36130941789803696391595 · `zaptly_client_rescheduled` 272006517898039483815948 · `zaptly_admin_booking` 322999617898041082465084 · `zaptly_admin_rescheduled` 210674917898041793438676 · `zaptly_booking_reminder` 128600217898032851295432. `zaptly_admin_booking` replaces the earlier admin "new booking" template (`85139317884571741379242`), which no longer appears in any workflow.
 - Accepted/rescheduled templates share one variable layout per recipient, so a single node per recipient picks the template by expression rather than an IF plus two nodes each. Client: name, session, admin, time, meeting link, manage link. Admin: name, session, client, time, meeting link. The reminder reuses the client layout.
 - The WhatsApp nodes continue on error, so a template problem can never block the email.
+
+---
+
+## 13. Phase 14 — Refund ledger, admin reschedule/cancel, question import, serial numbers
+
+- **Refund ledger (`0025_booking_refunds.sql`).** The old flow stored only an amount and a status on the booking and threw away Razorpay's refund id, so "processed" on the dashboard couldn't be traced to Razorpay, and a second partial refund overwrote the first. Now every refund Razorpay accepts is a `booking_refunds` row (Razorpay refund id + real status). `sync_booking_refund()` derives `refund_amount` (processed only), `refund_status` (processing/processed/failed) and `payment_status` from the ledger. `razorpay-webhook` handles `refund.created/processed/failed` (subscribe all three in Razorpay → Webhooks). Refunds made directly in the Razorpay dashboard appear too. Existing refunds were backfilled as `legacy-<booking id>` and flagged "verify on Razorpay".
+- **Who can refund.** The admin can refund (full / partial / none) both when approving a client's cancellation request and when cancelling a booking directly from Bookings. The refund runs first; if Razorpay refuses, nothing is cancelled and the reason is shown.
+- **Admin reschedule.** Bookings → ⋯ → Reschedule (confirmed bookings). Shares `moveBooking()` with request approval: conflict check now includes unexpired payment holds, rejects past times, resets `reminder_sent`, and goes through the same "rescheduled" notification pipeline. Blocked while a client request is pending on that booking.
+- **Reschedule slots.** Admin reschedule (direct and when approving a client request) now offers only real free slots — the same list clients see (weekly hours, window, notice, bookings, blocks, Google Calendar) — via `AdminSlotPicker`. The booking's own current slot is excluded from "busy" (`withoutOwnBooking`), so it's freed and re-offered; the client's own reschedule picker does the same. `moveBooking` still re-checks conflicts at save time and rejects a no-op move.
+- **Import questions.** Event form → Import: tick individual questions from other events; copies get new ids, duplicates by label are skipped, the 10-question cap is respected.
+- **Serial numbers** (`#`) on Bookings, Payments, Discounts, Enquiries and Admins, continuous across pages.

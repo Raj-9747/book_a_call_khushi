@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { sentenceCase } from "@/lib/utils";
 import { formatInTimeZone } from "date-fns-tz";
 import { CalendarDays, Clock, FileDown, Sparkles, Video } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
@@ -69,8 +70,8 @@ export default async function ManageBookingPage({ params }: { params: Promise<{ 
                 )}
               </div>
             </div>
-            <Badge tone={statusTone(booking.status)} className="capitalize">
-              {booking.status.replace("_", " ")}
+            <Badge tone={statusTone(booking.status)}>
+              {sentenceCase(booking.status)}
             </Badge>
           </div>
 

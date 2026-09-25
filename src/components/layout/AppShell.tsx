@@ -9,7 +9,7 @@ import { Avatar } from "@/components/ui";
 import { ZaptlyLogo } from "@/components/brand/ZaptlyLogo";
 import { ZaptlyMark } from "@/components/brand/ZaptlyMark";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
-import { cn } from "@/lib/utils";
+import { cn, sentenceCase } from "@/lib/utils";
 import { NAV_ITEMS_BY_SECTION, type NavSection } from "./nav-config";
 
 const SIDEBAR_STORAGE_KEY = "zaptly-sidebar-collapsed";
@@ -234,7 +234,7 @@ export function AppShell({
             <Avatar name={userName} />
             <div className={cn("min-w-0 flex-1", collapsed && "md:hidden")}>
               <p className="truncate text-sm font-medium text-neutral-900">{userName}</p>
-              <p className="truncate text-xs capitalize text-neutral-500">{userRole.replace("_", " ")}</p>
+              <p className="truncate text-xs text-neutral-500">{sentenceCase(userRole)}</p>
             </div>
             <button
               onClick={handleLogout}

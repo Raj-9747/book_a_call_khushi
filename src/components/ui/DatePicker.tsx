@@ -145,7 +145,7 @@ export function DatePicker({
               {days.map((day) => {
                 const inMonth = isSameMonth(day, visibleMonth);
                 const isSelected = selectedDate && isSameDay(day, selectedDate);
-                const isPast = minDate ? isBefore(day, minDate) : isBefore(day, today);
+                const isPast = minDate ? isBefore(day, startOfDay(minDate)) : isBefore(day, today);
                 return (
                   <button
                     key={day.toISOString()}

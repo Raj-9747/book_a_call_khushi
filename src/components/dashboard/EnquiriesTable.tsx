@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { sentenceCase } from "@/lib/utils";
 import { formatInTimeZone } from "date-fns-tz";
 import { CheckCircle2, MailCheck, Trash2 } from "lucide-react";
 import { toast } from "sonner";
@@ -82,6 +83,7 @@ export function EnquiriesTable({ adminId }: { adminId: string }) {
         <table className="w-full min-w-[720px] text-sm">
           <thead>
             <tr className="border-b border-border bg-neutral-50 text-left text-xs font-medium uppercase tracking-wide text-neutral-500">
+              <th className="w-12 px-4 py-3">#</th>
               <th className="px-6 py-3">Person</th>
               <th className="px-6 py-3">Interested in</th>
               <th className="px-6 py-3">Message</th>
@@ -91,8 +93,9 @@ export function EnquiriesTable({ adminId }: { adminId: string }) {
             </tr>
           </thead>
           <tbody>
-            {pageItems.map((enquiry) => (
+            {pageItems.map((enquiry, index) => (
               <tr key={enquiry.id} className="border-b border-border last:border-0 hover:bg-neutral-50">
+                <td className="px-4 py-3.5 text-neutral-400">{(page - 1) * pageSize + index + 1}</td>
                 <td className="px-6 py-3.5">
                   <p className="font-medium text-neutral-900">{enquiry.name}</p>
                   <p className="text-xs text-neutral-500">{enquiry.email}</p>
@@ -110,7 +113,7 @@ export function EnquiriesTable({ adminId }: { adminId: string }) {
                   {formatInTimeZone(new Date(enquiry.created_at), IST, "MMM d, h:mm a")}
                 </td>
                 <td className="px-6 py-3.5">
-                  <Badge tone={statusTone(enquiry.status)}>{enquiry.status}</Badge>
+                  <Badge tone={statusTone(enquiry.status)}>{sentenceCase(enquiry.status)}</Badge>
                 </td>
                 <td className="px-6 py-3.5 text-right">
                   <ActionsMenu

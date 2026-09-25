@@ -237,9 +237,10 @@ export function PaymentsManager({ adminId }: { adminId: string }) {
         ) : (
           <div className="overflow-hidden rounded-xl border border-border bg-surface">
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[900px] text-sm">
+              <table className="w-full min-w-[940px] text-sm">
                 <thead>
                   <tr className="border-b border-border bg-neutral-50 text-left text-xs font-medium uppercase tracking-wide text-neutral-500">
+                    <th className="w-12 px-4 py-3">#</th>
                     <th className="px-6 py-3">Date</th>
                     <th className="px-6 py-3">Client</th>
                     <th className="px-6 py-3">Session</th>
@@ -251,10 +252,11 @@ export function PaymentsManager({ adminId }: { adminId: string }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {rows.map((row) => {
+                  {rows.map((row, index) => {
                     const badge = statusBadge(row);
                     return (
                       <tr key={row.id} className="border-b border-border last:border-0 hover:bg-neutral-50">
+                        <td className="px-4 py-3.5 text-neutral-400">{(page - 1) * PAGE_SIZE + index + 1}</td>
                         <td className="px-6 py-3.5 whitespace-nowrap text-neutral-600">
                           {formatInTimeZone(new Date(row.created_at), IST, "MMM d, yyyy")}
                         </td>
@@ -281,7 +283,10 @@ export function PaymentsManager({ adminId }: { adminId: string }) {
                               "processed" — surfacing it is the only way to
                               know a refund actually completed. */}
                           {row.refund_status === "processing" && (
-                            <p className="mt-1 text-xs text-neutral-400">refund processing</p>
+                            <p className="mt-1 text-xs text-neutral-400">Refund pending at Razorpay</p>
+                          )}
+                          {row.refund_status === "failed" && (
+                            <p className="mt-1 text-xs text-danger-600">Refund failed — retry from Bookings</p>
                           )}
                         </td>
                         <td className="px-6 py-3.5">
