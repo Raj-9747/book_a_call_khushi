@@ -68,7 +68,10 @@ export function LoginForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
+    // method="post": if JS ever fails to load, the browser's fallback
+    // submit must not put the email and password in the URL (and so in
+    // history, logs and tunnel dashboards) the way a default GET does.
+    <form method="post" onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
       <FormField label="Email" htmlFor="email" error={errors.email?.message} required>
         <Input id="email" type="email" autoComplete="email" placeholder="you@company.com" {...register("email")} />
       </FormField>

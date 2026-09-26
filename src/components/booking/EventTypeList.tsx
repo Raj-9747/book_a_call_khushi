@@ -1,12 +1,13 @@
 import Link from "next/link";
-import { ArrowRight, CalendarX2, Clock, Video } from "lucide-react";
 import type { PublicAdminEventType } from "@/lib/api/publicBooking";
 
 export function formatPrice(price: number): string {
   return price > 0 ? `₹${price.toLocaleString("en-IN")}` : "Free";
 }
 
-/** The "pick a session" list on an admin's public profile. */
+/** "Today's menu" — the session list on an admin's public profile, laid out
+ * like a chai-stall menu board: one dashed-ruled row per session with its
+ * length, price and a Book button. Collapses to a stacked row on phones. */
 export function EventTypeList({
   adminSlug,
   eventTypes,
@@ -14,51 +15,51 @@ export function EventTypeList({
   adminSlug: string;
   eventTypes: PublicAdminEventType[];
 }) {
-  if (eventTypes.length === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border-strong bg-surface py-16 text-center">
-        <CalendarX2 className="h-8 w-8 text-neutral-300" />
-        <p className="mt-3 text-sm font-medium text-neutral-900">No sessions available yet</p>
-        <p className="mt-1 text-sm text-neutral-500">Check back soon.</p>
-      </div>
-    );
-  }
-
   return (
-    <ul className="grid gap-4 sm:grid-cols-2">
-      {eventTypes.map((eventType) => (
-        <li key={eventType.id}>
-          <Link
-            href={`/book/${adminSlug}/${eventType.slug}`}
-            className="group flex h-full flex-col rounded-2xl border border-border bg-surface p-5 shadow-xs transition-all hover:-translate-y-0.5 hover:border-brand-300 hover:shadow-md"
-          >
-            <p className="flex items-center gap-1.5 text-xs font-medium text-neutral-500">
-              <Video className="h-3.5 w-3.5" />
-              Video meeting
-              <span className="text-neutral-300">·</span>
-              <span className="inline-flex items-center gap-1">
-                <Clock className="h-3.5 w-3.5" />
-                {eventType.duration_minutes} mins
+    <section
+      id="sessions"
+      aria-labelledby="menu-heading"
+      className="flex flex-col rounded-[28px] bg-brand-700 px-6 pb-3 pt-8 text-surface-muted sm:px-10 lg:px-14 lg:pb-5 lg:pt-11"
+    >
+      <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2 pb-5">
+        <h2 id="menu-heading" className="font-display text-[34px] leading-tight sm:text-[44px]">
+          Today&apos;s menu
+        </h2>
+        <span className="text-base text-parchment">Every session is a 1:1 video call on Google Meet</span>
+      </div>
+
+      {eventTypes.length === 0 ? (
+        <p className="border-t-[1.5px] border-dashed border-surface-muted/35 py-10 text-center text-[17px] text-parchment">
+          Nothing on the menu just yet — check back soon.
+        </p>
+      ) : (
+        <ul>
+          {eventTypes.map((eventType) => (
+            <li
+              key={eventType.id}
+              className="grid grid-cols-[1fr_auto] items-center gap-x-6 gap-y-3 border-t-[1.5px] border-dashed border-surface-muted/35 py-6 md:grid-cols-[1fr_110px_110px_150px] md:py-7 lg:grid-cols-[1fr_130px_130px_150px]"
+            >
+              <div className="col-span-2 flex flex-col gap-1.5 md:col-span-1">
+                <span className="font-display text-2xl leading-tight sm:text-[30px]">{eventType.name}</span>
+                {eventType.description && (
+                  <span className="line-clamp-2 text-base text-parchment sm:text-[17px]">{eventType.description}</span>
+                )}
+              </div>
+              <span className="text-base text-parchment sm:text-[17px]">{eventType.duration_minutes} min</span>
+              <span className="text-right font-display text-2xl text-sun sm:text-[30px] md:text-left">
+                {formatPrice(eventType.price)}
               </span>
-            </p>
-
-            <h3 className="mt-3 text-base font-semibold leading-snug text-neutral-900">{eventType.name}</h3>
-
-            {eventType.description && (
-              <p className="mt-2 line-clamp-3 text-sm leading-relaxed text-neutral-500">{eventType.description}</p>
-            )}
-
-            {/* mt-auto pins the price row to the bottom so cards of differing
-                description lengths still line up across the grid. */}
-            <div className="mt-auto flex items-center justify-between gap-3 border-t border-border pt-4">
-              <span className="text-lg font-semibold text-neutral-900">{formatPrice(eventType.price)}</span>
-              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-neutral-900 text-surface transition-colors group-hover:bg-brand-600">
-                <ArrowRight className="h-4 w-4" />
-              </span>
-            </div>
-          </Link>
-        </li>
-      ))}
-    </ul>
+              <Link
+                href={`/book/${adminSlug}/${eventType.slug}`}
+                aria-label={`Book ${eventType.name}`}
+                className="col-span-2 flex min-h-[52px] items-center justify-center rounded-full bg-sun text-[17px] font-bold text-brand-900 transition-colors hover:bg-marigold-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sun focus-visible:ring-offset-2 focus-visible:ring-offset-brand-700 md:col-span-1"
+              >
+                Book →
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
   );
 }

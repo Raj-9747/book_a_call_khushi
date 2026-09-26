@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { ProfileSidePanel } from "@/components/booking/ProfileSidePanel";
 import { EventTypeList } from "@/components/booking/EventTypeList";
 import { EnquiryForm } from "@/components/booking/EnquiryForm";
+import { HowItWorks, ProfileHero, ProfileTopBar } from "@/components/booking/ProfileSections";
+import { getProfileShowcase } from "@/lib/branding/profileShowcase";
 import type { PublicAdmin, PublicAdminEventType } from "@/lib/api/publicBooking";
 
 async function loadAdmin(adminSlug: string) {
@@ -20,9 +21,13 @@ export async function generateMetadata({
   const { adminSlug } = await params;
   const admin = await loadAdmin(adminSlug);
   if (!admin) return { title: "Not found" };
+  const showcase = getProfileShowcase(adminSlug);
+  const title = `Book a call with ${admin.name}`;
+  const description = showcase.intro ?? admin.headline ?? admin.about ?? undefined;
   return {
-    title: `Book a call with ${admin.name}`,
-    description: admin.headline ?? admin.about ?? undefined,
+    title,
+    description,
+    openGraph: { title, description, images: admin.photo_url ? [admin.photo_url] : undefined },
   };
 }
 
@@ -40,38 +45,27 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
     ...row,
     price: Number(row.price),
   }));
+  const showcase = getProfileShowcase(admin.slug);
 
   return (
-    // Two-pane on desktop: a fixed identity panel that stays put while the
-    // session list scrolls beside it. Stacks on mobile, panel first.
-    <div className="min-h-screen bg-surface-muted lg:flex lg:items-start">
-      <ProfileSidePanel admin={admin} />
+    // The design is a 1440px artboard with 96px side padding; the cap is a
+    // little wider so big screens don't sit in a narrow column.
+    <div className="mx-auto flex w-full max-w-[1536px] flex-col gap-12 px-5 pb-10 pt-6 sm:px-10 sm:pt-10 lg:gap-14 xl:px-24 xl:pb-12 xl:pt-11">
+      <ProfileTopBar admin={admin} showcase={showcase} />
+      <ProfileHero admin={admin} showcase={showcase} />
 
-      <main className="flex-1 px-5 py-8 sm:px-8 lg:px-12 lg:py-14">
-        <div className="mx-auto max-w-3xl">
-          {admin.accepting_bookings ? (
-            <>
-              <div className="mb-6">
-                <h2 className="text-xl font-semibold tracking-tight text-neutral-900">Book a session</h2>
-                <p className="mt-1 text-sm text-neutral-500">
-                  Pick what you need and choose a time that works for you.
-                </p>
-              </div>
-              <EventTypeList adminSlug={admin.slug} eventTypes={eventTypes} />
-            </>
-          ) : (
-            <EnquiryForm
-              adminSlug={admin.slug}
-              adminName={admin.name}
-              unavailableMessage={admin.unavailable_message}
-            />
-          )}
-
-          <p className="mt-10 flex items-center justify-center gap-1.5 text-xs text-neutral-400 lg:hidden">
-            Powered by Zaptly
-          </p>
+      {admin.accepting_bookings ? (
+        <>
+          <EventTypeList adminSlug={admin.slug} eventTypes={eventTypes} />
+          <HowItWorks />
+        </>
+      ) : (
+        <div className="mx-auto w-full max-w-2xl">
+          <EnquiryForm adminSlug={admin.slug} adminName={admin.name} unavailableMessage={admin.unavailable_message} />
         </div>
-      </main>
+      )}
+
+      <p className="text-center text-sm text-neutral-500">Powered by Zaptly</p>
     </div>
   );
 }
