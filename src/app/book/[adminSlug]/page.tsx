@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { EventTypeList } from "@/components/booking/EventTypeList";
 import { EnquiryForm } from "@/components/booking/EnquiryForm";
 import { HowItWorks, ProfileHero, ProfileTopBar } from "@/components/booking/ProfileSections";
+import { Testimonials } from "@/components/booking/Testimonials";
 import { getProfileShowcase } from "@/lib/branding/profileShowcase";
 import type { PublicAdmin, PublicAdminEventType } from "@/lib/api/publicBooking";
 
@@ -55,15 +56,20 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
       <ProfileHero admin={admin} showcase={showcase} />
 
       {admin.accepting_bookings ? (
-        <>
-          <EventTypeList adminSlug={admin.slug} eventTypes={eventTypes} />
-          <HowItWorks />
-        </>
+        <EventTypeList adminSlug={admin.slug} eventTypes={eventTypes} />
       ) : (
         <div className="mx-auto w-full max-w-2xl">
           <EnquiryForm adminSlug={admin.slug} adminName={admin.name} unavailableMessage={admin.unavailable_message} />
         </div>
       )}
+
+      {/* Social proof sits right under the menu — the moment someone is
+          deciding whether to book is when reviews do the most work. */}
+      {showcase.testimonials && showcase.testimonials.length > 0 && (
+        <Testimonials items={showcase.testimonials} rating={showcase.rating} />
+      )}
+
+      {admin.accepting_bookings && <HowItWorks />}
 
       <p className="text-center text-sm text-neutral-500">Powered by Zaptly</p>
     </div>
