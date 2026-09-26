@@ -158,13 +158,13 @@
 }
 
 /* ==========================================================================
-   Public booking theme — "Chashmish"
+   Public booking theme — "Chai Menu"
    --------------------------------------------------------------------------
-   Khushi's public pages (/book/*) get their own warm, editorial palette:
-   cream paper, warm-stone neutrals and a coral accent lifted from her
-   Instagram/Topmate brand. Same trick as dark mode — it re-points the
-   existing tokens, so every component built on bg-surface / text-neutral-*
-   / brand-* picks it up with no per-component work.
+   Khushi's public pages (/book/*) follow the "Chai Menu — warm & playful"
+   design: cream paper (#FFF6DF), maroon ink (#5B1520 / #7A1F2B), marigold
+   (#F2B705) and chai-sun yellow (#FFC940). Same trick as dark mode — it
+   re-points the existing tokens, so every component built on bg-surface /
+   text-neutral-* / brand-* picks it up with no per-component work.
 
    Scoped to a class rather than :root so the admin dashboard keeps its own
    look. The class sits on the page wrapper (for SSR) AND on <body> while a
@@ -172,48 +172,63 @@
    portal into document.body and would otherwise escape the wrapper.
    ========================================================================== */
 .theme-khushi {
-  --background: #fbf6ee;
-  --foreground: #1e1a17;
+  --background: #fff6df;
+  --foreground: #2b1a12;
 
-  --neutral-50: #f8f3eb;
-  --neutral-100: #f1eadf;
-  --neutral-200: #e6ddd0;
-  --neutral-300: #d5c9b8;
-  --neutral-400: #a69a8a;
-  --neutral-500: #786d61;
-  --neutral-600: #5b5249;
-  --neutral-700: #443d36;
-  --neutral-800: #2e2925;
-  --neutral-900: #1e1a17;
+  /* Warm chai-brown neutrals. 500 = the design's muted #7A5A3A, 700 = its
+     body copy #4A3328, 900 = its ink #2B1A12. */
+  --neutral-50: #fcf0d4;
+  --neutral-100: #f6e7c6;
+  --neutral-200: #ecdab4;
+  --neutral-300: #dcc49a;
+  --neutral-400: #b09472;
+  --neutral-500: #7a5a3a;
+  --neutral-600: #5f4533;
+  --neutral-700: #4a3328;
+  --neutral-800: #3a261c;
+  --neutral-900: #2b1a12;
 
-  --brand-50: #fef3ef;
-  --brand-100: #fde2d9;
-  --brand-200: #fac4b4;
-  --brand-300: #f49d86;
-  --brand-400: #ec7759;
-  --brand-500: #e2583b;
-  --brand-600: #cf4529;
-  --brand-700: #ad3620;
-  --brand-800: #8b2d1d;
-  --brand-900: #72281c;
+  /* Maroon. 600 = #7A1F2B (buttons, links, outlines), 700 = #5B1520
+     (headings, the menu card), 900 = #3A0E14 (text on yellow). */
+  --brand-50: #fbeee6;
+  --brand-100: #f6dcd3;
+  --brand-200: #ebb8ad;
+  --brand-300: #d98c82;
+  --brand-400: #bd5f5b;
+  --brand-500: #9a3540;
+  --brand-600: #7a1f2b;
+  --brand-700: #5b1520;
+  --brand-800: #4a1019;
+  --brand-900: #3a0e14;
 
-  /* Marigold — stars, "Popular" badges. Used sparingly. */
-  --marigold-100: #fdf0cf;
-  --marigold-400: #f3b73e;
-  --marigold-700: #8a5a08;
+  /* Marigold (#F2B705) and chai-sun (#FFC940) — step numbers, prices and
+     Book buttons on the maroon menu, the flower badge. */
+  --marigold-100: #fdeeb8;
+  --marigold-400: #f2b705;
+  --marigold-700: #7a5a00;
+  --sun: #ffc940;
+  --parchment: #f3ddb8;
+  --photo-bg: #eadcb8;
 
-  --surface: #fffdf9;
-  --surface-muted: #fbf6ee;
-  --border: #ebe2d5;
-  --border-strong: #d9ccba;
+  --surface: #fffbef;
+  --surface-muted: #fff6df;
+  --border: #ecdab4;
+  --border-strong: #dcc49a;
 
-  --shadow-xs: 0 1px 2px 0 rgb(60 40 20 / 0.04);
-  --shadow-sm: 0 1px 3px 0 rgb(60 40 20 / 0.06), 0 1px 2px -1px rgb(60 40 20 / 0.04);
-  --shadow-md: 0 8px 20px -6px rgb(60 40 20 / 0.12), 0 2px 4px -2px rgb(60 40 20 / 0.05);
-  --shadow-lg: 0 20px 40px -12px rgb(60 40 20 / 0.18), 0 4px 8px -4px rgb(60 40 20 / 0.06);
+  --shadow-xs: 0 1px 2px 0 rgb(91 21 32 / 0.05);
+  --shadow-sm: 0 1px 3px 0 rgb(91 21 32 / 0.07), 0 1px 2px -1px rgb(91 21 32 / 0.05);
+  --shadow-md: 0 10px 30px -10px rgb(91 21 32 / 0.18), 0 2px 4px -2px rgb(91 21 32 / 0.06);
+  --shadow-lg: 0 10px 30px rgb(91 21 32 / 0.18);
 
   color-scheme: light;
   font-family: var(--font-khushi-sans), var(--font-geist-sans), Arial, Helvetica, sans-serif;
+}
+
+/* Young Serif has a single weight; stop a stray font-semibold from making
+   the browser smear a fake bold over it. */
+.theme-khushi .font-display {
+  font-weight: 400;
+  font-synthesis: none;
 }
 
 body.theme-khushi {
@@ -225,6 +240,9 @@ body.theme-khushi {
   --color-marigold-100: var(--marigold-100);
   --color-marigold-400: var(--marigold-400);
   --color-marigold-700: var(--marigold-700);
+  --color-sun: var(--sun);
+  --color-parchment: var(--parchment);
+  --color-photo-bg: var(--photo-bg);
   --font-display: var(--font-khushi-display), Georgia, "Times New Roman", serif;
 
   --color-background: var(--background);
@@ -297,8 +315,14 @@ body {
   font-family: var(--font-sans), Arial, Helvetica, sans-serif;
 }
 
-* {
-  border-color: var(--border);
+/* In @layer base, not unlayered: unlayered CSS beats every Tailwind
+   utility regardless of specificity, so this rule used to silently override
+   every border-brand-*, border-success-*, … class in the app. As a base
+   style it stays the default and utilities win when they are set. */
+@layer base {
+  * {
+    border-color: var(--border);
+  }
 }
 
 /* Strip the native number-input spinners. They're browser-drawn chrome we

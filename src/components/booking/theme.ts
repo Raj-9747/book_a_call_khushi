@@ -1,14 +1,15 @@
-import { DM_Sans, Fraunces } from "next/font/google";
+import { DM_Sans, Young_Serif } from "next/font/google";
 
 /** Fonts for the public booking pages only — the dashboard stays on Geist.
  *
- * Fraunces is a soft, slightly quirky serif: editorial enough to feel like
- * a creator's own page rather than a SaaS form, warm enough to match
- * Khushi's voice. DM Sans keeps body copy and form UI crisp. */
-const display = Fraunces({
+ * Straight from the "Chai Menu" design: Young Serif for display type (a
+ * warm, chunky serif that reads like a café menu board) and DM Sans for
+ * body copy and form UI. Young Serif ships in one weight only, so display
+ * text is never bolded — see `.theme-khushi .font-display` in globals.css. */
+const display = Young_Serif({
   variable: "--font-khushi-display",
   subsets: ["latin"],
-  axes: ["SOFT", "opsz"],
+  weight: "400",
 });
 
 const sans = DM_Sans({

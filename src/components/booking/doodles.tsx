@@ -1,16 +1,39 @@
 import type { SVGProps } from "react";
 
-// Hand-drawn-feeling marks for the booking theme. Stroked in currentColor on
-// the same 24-unit grid as Lucide so they size and colour like the icons.
+// Marks from the "Chai Menu" design. Stroked/filled in currentColor where
+// they're monochrome, so they colour like the rest of the icon set.
 
-/** Round glasses — the "chashmish" in @chashmishkhushi. */
+/** Round glasses — the "chashmish" in @chashmishkhushi. The wordmark logo. */
 export function GlassesDoodle(props: SVGProps<SVGSVGElement>) {
   return (
-    <svg viewBox="0 0 40 20" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true" {...props}>
-      <circle cx="10" cy="11" r="7" />
-      <circle cx="30" cy="11" r="7" />
-      <path d="M17 10c1.8-1.6 4.2-1.6 6 0" />
-      <path d="M3 9 1 5M37 9l2-4" />
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      {...props}
+    >
+      <circle cx="7" cy="14" r="4" />
+      <circle cx="17" cy="14" r="4" />
+      <path d="M11 14h2M3 14l-1-4M21 14l1-4" />
+    </svg>
+  );
+}
+
+/** The marigold badge tucked against the hero photo — twelve marigold petals
+ * around a maroon centre. Two-tone, so it takes its colours from tokens. */
+export function MarigoldFlower(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 100 100" aria-hidden="true" {...props}>
+      <g fill="var(--marigold-400)">
+        {Array.from({ length: 12 }, (_, i) => (
+          <ellipse key={i} cx="50" cy="20" rx="9" ry="18" transform={`rotate(${i * 30} 50 50)`} />
+        ))}
+      </g>
+      <circle cx="50" cy="50" r="17" fill="var(--brand-700)" />
     </svg>
   );
 }

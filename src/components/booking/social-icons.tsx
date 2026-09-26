@@ -28,3 +28,51 @@ export function InstagramIcon(props: SVGProps<SVGSVGElement>) {
     </svg>
   );
 }
+
+// Outline variants from the "Chai Menu" design — stroked, not filled, to
+// sit inside its outlined pill links. Same 24-unit grid.
+
+function OutlineIcon({ children, ...props }: SVGProps<SVGSVGElement>) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      {...props}
+    >
+      {children}
+    </svg>
+  );
+}
+
+export function InstagramOutlineIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <OutlineIcon {...props}>
+      <rect x="3" y="3" width="18" height="18" rx="5" />
+      <circle cx="12" cy="12" r="4" />
+      <circle cx="17.5" cy="6.5" r="0.6" />
+    </OutlineIcon>
+  );
+}
+
+export function YouTubeOutlineIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <OutlineIcon {...props}>
+      <rect x="2" y="5" width="20" height="14" rx="4" />
+      <path d="M10 9l5 3-5 3z" />
+    </OutlineIcon>
+  );
+}
+
+export function LinkedInOutlineIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <OutlineIcon {...props}>
+      <rect x="3" y="3" width="18" height="18" rx="3" />
+      <path d="M8 11v5M8 8v.01M12 16v-5M16 16v-3a2 2 0 0 0-4 0" />
+    </OutlineIcon>
+  );
+}

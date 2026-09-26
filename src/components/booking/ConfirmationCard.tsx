@@ -18,21 +18,21 @@ export function ConfirmationCard({
   visitorTimeZone: string;
 }) {
   return (
-    <div className="mx-auto max-w-lg overflow-clip rounded-[2rem] border border-border bg-surface text-center shadow-md">
-      <div className="relative bg-neutral-50 px-6 pb-8 pt-10">
+    <div className="mx-auto max-w-lg overflow-clip rounded-[28px] border-[1.5px] border-border bg-surface text-center shadow-md">
+      <div className="relative bg-brand-700 px-6 pb-8 pt-10 text-surface-muted">
         <div
           aria-hidden="true"
-          className="pointer-events-none absolute inset-0 bg-[radial-gradient(60%_80%_at_50%_0%,var(--brand-100)_0%,transparent_75%)]"
+          className="pointer-events-none absolute inset-0 bg-[radial-gradient(60%_80%_at_50%_0%,rgb(255_201_64/0.18)_0%,transparent_75%)]"
         />
         <SparkleDoodle aria-hidden="true" className="absolute left-[22%] top-8 h-4 w-4 text-marigold-400" />
-        <SparkleDoodle aria-hidden="true" className="absolute right-[24%] top-14 h-3 w-3 text-brand-400" />
-        <span className="relative mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-brand-600 text-white shadow-lg">
+        <SparkleDoodle aria-hidden="true" className="absolute right-[24%] top-14 h-3 w-3 text-sun" />
+        <span className="relative mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-sun text-brand-900 shadow-lg">
           <Check className="h-8 w-8" strokeWidth={3} />
         </span>
-        <h2 className="relative mt-5 font-display text-3xl font-semibold tracking-tight text-neutral-900 [font-variation-settings:'SOFT'_100]">
+        <h2 className="relative mt-5 font-display text-4xl">
           You&apos;re booked!
         </h2>
-        <p className="relative mt-1.5 text-sm text-neutral-500">Can&apos;t wait to chat ✨</p>
+        <p className="relative mt-1.5 text-[15px] text-parchment">Your chai date is set ☕</p>
       </div>
 
       <div className="space-y-5 px-6 py-7 text-left sm:px-8">

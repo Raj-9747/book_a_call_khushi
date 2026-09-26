@@ -6,6 +6,8 @@ import { ChevronLeft } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { BookingFlow } from "@/components/booking/BookingFlow";
 import { EnquiryForm } from "@/components/booking/EnquiryForm";
+import { ProfileTopBar } from "@/components/booking/ProfileSections";
+import { getProfileShowcase } from "@/lib/branding/profileShowcase";
 import type { PublicAdmin, PublicEventType } from "@/lib/api/publicBooking";
 
 type Params = Promise<{ adminSlug: string; eventSlug: string }>;
@@ -52,18 +54,16 @@ export default async function PublicBookingPage({ params }: { params: Params }) 
   const { admin, eventType } = loaded;
 
   return (
-    <div className="relative flex flex-1 justify-center px-4 py-6 sm:px-6 sm:py-12">
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-x-0 top-0 h-[420px] bg-[radial-gradient(50%_60%_at_20%_0%,var(--brand-100)_0%,transparent_100%),radial-gradient(40%_50%_at_85%_5%,var(--marigold-100)_0%,transparent_100%)] opacity-70"
-      />
-      <div className="relative w-full max-w-[1240px]">
+    <div className="mx-auto flex w-full max-w-[1536px] flex-col gap-8 px-5 pb-10 pt-6 sm:px-10 sm:pt-10 xl:px-24 xl:pt-11">
+      <ProfileTopBar admin={admin} showcase={getProfileShowcase(admin.slug)} />
+
+      <div className="w-full">
         <Link
           href={`/book/${admin.slug}`}
-          className="mb-5 inline-flex items-center gap-1.5 rounded-full border border-border bg-surface px-3.5 py-1.5 text-sm font-medium text-neutral-600 shadow-xs transition-colors hover:border-brand-300 hover:text-brand-700"
+          className="mb-5 inline-flex items-center gap-1.5 rounded-full border-[1.5px] border-brand-600 px-4 py-2 text-sm font-semibold text-brand-600 transition-colors hover:bg-brand-600/5 hover:text-brand-700"
         >
           <ChevronLeft className="h-4 w-4" />
-          All sessions
+          Back to the menu
         </Link>
 
         {/* The toggle is re-checked server-side on every booking attempt too

@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { formatInTimeZone } from "date-fns-tz";
 import { ArrowRight, CalendarDays, CheckCircle2, Clock, Video } from "lucide-react";
 import { toast } from "sonner";
-import { Button, Modal, Spinner } from "@/components/ui";
+import { Avatar, Button, Modal, Spinner } from "@/components/ui";
 import { computeAvailableSlots } from "@/lib/availability/computeSlots";
 import {
   getBusyRanges,
@@ -16,7 +16,6 @@ import {
 } from "@/lib/api/publicBooking";
 import { openRazorpayCheckout } from "@/lib/payments/razorpay";
 import { toE164, type BookingDetailsValues } from "@/lib/validations/publicBooking";
-import { AdminProfileHeader } from "./AdminProfileHeader";
 import { CalendarSlotPicker } from "./CalendarSlotPicker";
 import { BookingDetailsForm } from "./BookingDetailsForm";
 import { DiscountBox, type AppliedDiscount } from "./DiscountBox";
@@ -189,42 +188,45 @@ export function BookingFlow({ admin, eventType }: { admin: PublicAdmin; eventTyp
           left, when on the right. Stacks on mobile, summary first.
           overflow-clip (not -hidden) rounds the corners without creating a
           scroll container, which would break the sticky Continue bar. */}
-      <div className="overflow-clip rounded-[2rem] border border-border bg-surface shadow-md lg:grid lg:grid-cols-[360px_minmax(0,1fr)] xl:grid-cols-[420px_minmax(0,1fr)]">
-        <section className="relative border-b border-border bg-neutral-50 p-6 sm:p-8 lg:border-b-0 lg:border-r">
-          <div
-            aria-hidden="true"
-            className="pointer-events-none absolute inset-x-0 top-0 h-32 bg-[radial-gradient(80%_100%_at_0%_0%,var(--brand-100)_0%,transparent_70%)]"
-          />
-          <div className="relative space-y-6">
-            <AdminProfileHeader admin={admin} compact />
-
-            <div>
-              <h1 className="font-display text-3xl font-semibold leading-tight tracking-tight text-neutral-900 [font-variation-settings:'SOFT'_100]">
-                {eventType.name}
-              </h1>
-              <div className="mt-4 flex flex-wrap items-center gap-2 text-sm">
-                <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface px-3 py-1 text-neutral-600">
-                  <Clock className="h-3.5 w-3.5" />
-                  {eventType.duration_minutes} min
-                </span>
-                <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface px-3 py-1 text-neutral-600">
-                  <Video className="h-3.5 w-3.5" />
-                  Google Meet
-                </span>
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-neutral-900 px-3 py-1 text-surface">
-                  {isPaid && discount && (
-                    <span className="text-surface/60 line-through">{formatAmount(eventType.price)}</span>
-                  )}
-                  <span className="font-semibold">{isPaid ? formatAmount(total) : "Free"}</span>
-                </span>
+      <div className="overflow-clip rounded-[28px] border-[1.5px] border-border bg-surface shadow-md lg:grid lg:grid-cols-[360px_minmax(0,1fr)] xl:grid-cols-[420px_minmax(0,1fr)]">
+        {/* The summary is a slice of the profile's maroon "Today's menu"
+            card, so the booking step reads as the same menu, one item
+            opened up. */}
+        <section className="bg-brand-700 p-6 text-surface-muted sm:p-8">
+          <div className="space-y-6">
+            <div className="flex items-center gap-3">
+              <Avatar name={admin.name} src={admin.photo_url} className="h-11 w-11 ring-2 ring-marigold-400" />
+              <div className="min-w-0">
+                <p className="truncate text-sm font-semibold">{admin.name}</p>
+                {admin.headline && <p className="truncate text-xs text-parchment">{admin.headline}</p>}
               </div>
             </div>
 
+            <div>
+              <h1 className="font-display text-[32px] leading-tight sm:text-[36px]">{eventType.name}</h1>
+              <div className="mt-4 flex flex-wrap items-center gap-2 text-sm">
+                <span className="inline-flex items-center gap-1.5 rounded-full border-[1.5px] border-dashed border-surface-muted/40 px-3 py-1 text-parchment">
+                  <Clock className="h-3.5 w-3.5" />
+                  {eventType.duration_minutes} min
+                </span>
+                <span className="inline-flex items-center gap-1.5 rounded-full border-[1.5px] border-dashed border-surface-muted/40 px-3 py-1 text-parchment">
+                  <Video className="h-3.5 w-3.5" />
+                  Google Meet
+                </span>
+              </div>
+              <p className="mt-5 flex items-baseline gap-2.5">
+                {isPaid && discount && (
+                  <span className="font-display text-xl text-parchment/70 line-through">{formatAmount(eventType.price)}</span>
+                )}
+                <span className="font-display text-[34px] leading-none text-sun">{isPaid ? formatAmount(total) : "Free"}</span>
+              </p>
+            </div>
+
             {eventType.description && (
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-brand-600">About this session</p>
+              <div className="border-t-[1.5px] border-dashed border-surface-muted/35 pt-5">
+                <p className="text-xs font-bold uppercase tracking-[0.12em] text-sun">About this session</p>
                 {/* whitespace-pre-line so the admin's own line breaks survive. */}
-                <p className="mt-2 whitespace-pre-line text-[15px] leading-relaxed text-neutral-700">
+                <p className="mt-2 whitespace-pre-line text-[15px] leading-relaxed text-parchment">
                   {eventType.description}
                 </p>
               </div>
@@ -233,24 +235,24 @@ export function BookingFlow({ admin, eventType }: { admin: PublicAdmin; eventTyp
             {/* Stated before booking, not discovered when a bot joins the
                 call — see PLAN.md §11.2 "Client consent". */}
             {eventType.record_meeting && (
-              <div className="flex items-start gap-2.5 rounded-2xl border border-brand-200 bg-brand-50 px-4 py-3 text-sm text-brand-800">
-                <Video className="mt-0.5 h-4 w-4 shrink-0" />
+              <div className="flex items-start gap-2.5 rounded-2xl bg-surface-muted/10 px-4 py-3 text-sm text-surface-muted">
+                <Video className="mt-0.5 h-4 w-4 shrink-0 text-sun" />
                 <p>This session is recorded and you&apos;ll get a summary of what was discussed afterwards.</p>
               </div>
             )}
 
-            <ul className="space-y-2.5 border-t border-border pt-6 text-sm text-neutral-600">
+            <ul className="space-y-2.5 border-t-[1.5px] border-dashed border-surface-muted/35 pt-5 text-sm text-parchment">
               <li className="flex items-start gap-2.5">
-                <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-brand-500" />
+                <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-sun" />
                 Instant confirmation with your Meet link
               </li>
               <li className="flex items-start gap-2.5">
-                <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-brand-500" />
+                <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-sun" />
                 A reminder an hour before the call
               </li>
               {isPaid && (
                 <li className="flex items-start gap-2.5">
-                  <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-brand-500" />
+                  <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-sun" />
                   Secure payment by UPI, card or netbanking
                 </li>
               )}
@@ -259,8 +261,8 @@ export function BookingFlow({ admin, eventType }: { admin: PublicAdmin; eventTyp
         </section>
 
         <section className="flex flex-col p-6 sm:p-8">
-          <h2 className="font-display text-2xl font-semibold tracking-tight text-neutral-900">Pick a time</h2>
-          <p className="mt-1 text-sm text-neutral-500">Choose a date, then a slot that suits you.</p>
+          <h2 className="font-display text-[30px] leading-tight text-brand-700">Pick a time</h2>
+          <p className="mt-1 text-[15px] text-neutral-700">Choose a date, then a slot that suits you.</p>
 
           <div className="mt-6 flex-1">
             {slots === null ? (
@@ -300,7 +302,7 @@ export function BookingFlow({ admin, eventType }: { admin: PublicAdmin; eventTyp
                   : "No time selected yet"}
               </p>
               <Button
-                className="w-full rounded-full sm:w-auto sm:min-w-44"
+                className="min-h-[52px] w-full rounded-full font-bold sm:w-auto sm:min-w-44"
                 size="lg"
                 disabled={!selectedSlot}
                 onClick={() => setModalOpen(true)}

@@ -1,148 +1,148 @@
-import type { ReactNode } from "react";
-import { CalendarCheck, ChevronDown, MousePointerClick, Quote, Star, Video } from "lucide-react";
+import { Globe } from "lucide-react";
+import type { PublicAdmin } from "@/lib/api/publicBooking";
 import type { ProfileShowcase } from "@/lib/branding/profileShowcase";
-import { GlassesDoodle, SparkleDoodle } from "./doodles";
+import { GlassesDoodle, MarigoldFlower } from "./doodles";
+import { InstagramOutlineIcon, LinkedInOutlineIcon, XIcon, YouTubeOutlineIcon } from "./social-icons";
 
-/** Consistent heading for every block on the public profile. */
-export function SectionHeading({ eyebrow, title, children }: { eyebrow: string; title: string; children?: ReactNode }) {
+// The public profile, built to the "Chai Menu — warm & playful" design:
+// wordmark bar → hero with an arch-framed photo → the maroon session menu
+// (EventTypeList) → three numbered steps.
+
+function initials(name: string) {
+  return name
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join("");
+}
+
+/** Glasses logo + lower-case wordmark on the left, outlined social pills on
+ * the right. Shared by the profile and the booking page so both read as
+ * one site. */
+export function ProfileTopBar({ admin, showcase }: { admin: PublicAdmin; showcase: ProfileShowcase }) {
+  const socials = [
+    { href: admin.instagram_url, icon: InstagramOutlineIcon, label: "Instagram" },
+    { href: showcase.youtubeUrl, icon: YouTubeOutlineIcon, label: "YouTube" },
+    { href: admin.linkedin_url, icon: LinkedInOutlineIcon, label: "LinkedIn" },
+    { href: admin.x_url, icon: XIcon, label: "X" },
+    { href: admin.website_url, icon: Globe, label: "Website" },
+  ].filter((s): s is { href: string; icon: typeof InstagramOutlineIcon; label: string } => !!s.href);
+
   return (
-    <div className="mb-6">
-      <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-brand-600">
-        <SparkleDoodle className="h-3 w-3" />
-        {eyebrow}
-      </p>
-      <h2 className="mt-2 font-display text-3xl font-semibold tracking-tight text-neutral-900 [font-variation-settings:'SOFT'_100]">
-        {title}
-      </h2>
-      {children && <p className="mt-2 text-[15px] text-neutral-500">{children}</p>}
-    </div>
+    <header className="flex flex-wrap items-center justify-between gap-x-6 gap-y-4">
+      <a href={`/book/${admin.slug}`} className="flex items-center gap-2.5 text-brand-700">
+        <GlassesDoodle className="h-[34px] w-[34px]" />
+        <span className="font-display text-2xl leading-none">{showcase.brandName ?? admin.name.toLowerCase()}</span>
+      </a>
+
+      {socials.length > 0 && (
+        <nav aria-label="Social links" className="flex flex-wrap gap-2.5">
+          {socials.map(({ href, icon: Icon, label }) => (
+            <a
+              key={label}
+              href={href}
+              target="_blank"
+              rel="noreferrer noopener"
+              aria-label={label}
+              className="flex items-center gap-2 rounded-full border-[1.5px] border-brand-600 p-3 text-[15px] font-semibold text-brand-600 transition-colors hover:bg-brand-600/5 hover:text-brand-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2 focus-visible:ring-offset-surface-muted sm:px-[18px]"
+            >
+              <Icon className="h-[18px] w-[18px]" />
+              {/* Icon-only on phones so the row fits beside the wordmark. */}
+              <span className="hidden sm:inline">{label}</span>
+            </a>
+          ))}
+        </nav>
+      )}
+    </header>
   );
 }
 
-export function Testimonials({
-  items,
-  rating,
-}: {
-  items: NonNullable<ProfileShowcase["testimonials"]>;
-  rating?: ProfileShowcase["rating"];
-}) {
-  const [featured, ...rest] = items;
+export function ProfileHero({ admin, showcase }: { admin: PublicAdmin; showcase: ProfileShowcase }) {
+  const firstName = admin.name.trim().split(/\s+/)[0];
+  const intro = showcase.intro ?? admin.headline ?? admin.about;
+
   return (
-    <section>
-      <SectionHeading eyebrow="Kind words" title="What people say">
-        {rating ? `Rated ${rating.score}/5 by ${rating.count} people who've booked a session.` : undefined}
-      </SectionHeading>
-
-      <div className="grid gap-4 sm:grid-cols-2 2xl:grid-cols-3">
-        {/* The strongest quote gets a full-width, coloured card; the rest
-            sit beneath it as a quieter grid. */}
-        <figure className="relative overflow-hidden rounded-3xl bg-neutral-900 p-7 text-white sm:col-span-2 2xl:col-span-3 2xl:p-9">
-          <Quote aria-hidden="true" className="absolute -right-2 -top-2 h-28 w-28 rotate-180 text-white/5" />
-          <Stars className="text-marigold-400" />
-          <blockquote className="relative mt-4 font-display text-xl leading-snug [font-variation-settings:'SOFT'_100] sm:text-2xl">
-            “{featured.quote}”
-          </blockquote>
-          <figcaption className="mt-5 flex items-center gap-3 text-sm">
-            <Initial name={featured.name} className="bg-brand-500 text-white" />
-            <span className="font-medium">{featured.name}</span>
-          </figcaption>
-        </figure>
-
-        {rest.map((t) => (
-          <figure key={t.name} className="flex flex-col rounded-3xl border border-border bg-surface p-6">
-            <Stars className="text-marigold-400" />
-            <blockquote className="mt-3 text-[15px] leading-relaxed text-neutral-700">“{t.quote}”</blockquote>
-            <figcaption className="mt-auto flex items-center gap-3 pt-5 text-sm">
-              <Initial name={t.name} className="bg-brand-100 text-brand-700" />
-              <span className="font-medium text-neutral-900">{t.name}</span>
-            </figcaption>
-          </figure>
-        ))}
+    <section className="grid items-center gap-12 lg:grid-cols-[1.25fr_1fr] lg:gap-[72px]">
+      <div className="flex flex-col gap-7">
+        <span className="self-start rounded-full bg-brand-600 px-4 py-2 text-[13px] font-bold uppercase tracking-[0.12em] text-surface-muted">
+          Book a 1:1
+        </span>
+        <h1 className="font-display text-[44px] leading-[1.02] text-brand-700 sm:text-6xl lg:text-7xl xl:text-[86px]">
+          {showcase.heroTitle ?? `Let's talk with ${firstName}.`}
+        </h1>
+        {intro && (
+          // whitespace-pre-line so an admin's own paragraph breaks survive
+          // when the intro falls back to their bio.
+          <p className="max-w-[580px] whitespace-pre-line text-lg leading-[1.55] text-neutral-700 sm:text-[21px]">
+            {intro}
+          </p>
+        )}
+        {showcase.highlights && showcase.highlights.length > 0 && (
+          <ul className="flex flex-wrap gap-2.5">
+            {showcase.highlights.map((h) => (
+              <li
+                key={h}
+                className="rounded-full border-[1.5px] border-dashed border-brand-600 px-4 py-[9px] text-[15px] font-medium text-brand-700"
+              >
+                {h}
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
-    </section>
-  );
-}
 
-function Stars({ className }: { className?: string }) {
-  return (
-    <span className={`flex gap-0.5 ${className ?? ""}`} aria-label="5 out of 5 stars">
-      {Array.from({ length: 5 }, (_, i) => (
-        <Star key={i} className="h-4 w-4 fill-current" aria-hidden="true" />
-      ))}
-    </span>
-  );
-}
-
-function Initial({ name, className }: { name: string; className: string }) {
-  return (
-    <span
-      aria-hidden="true"
-      className={`flex h-9 w-9 items-center justify-center rounded-full text-sm font-semibold ${className}`}
-    >
-      {name.trim()[0]?.toUpperCase()}
-    </span>
-  );
-}
-
-export function AboutSection({ name, about }: { name: string; about: string }) {
-  const firstName = name.trim().split(/\s+/)[0];
-  return (
-    <section>
-      <SectionHeading eyebrow="About" title={`Hi, I'm ${firstName}`} />
-      <div className="relative rounded-3xl border border-border bg-surface p-6 sm:p-8">
-        <GlassesDoodle aria-hidden="true" className="absolute right-6 top-6 h-5 w-10 text-brand-300" />
-        {/* whitespace-pre-line so the admin's own paragraph breaks survive. */}
-        <p className="whitespace-pre-line pr-10 text-[15px] leading-7 text-neutral-700">{about}</p>
+      {/* The arch: a marigold frame with the photo inset 16px inside it.
+          The top corners are half the frame's width (container-query units),
+          so the top is a true semicircle at any size, not just at 1440px. */}
+      <div className="@container mx-auto w-full max-w-[400px] lg:max-w-none">
+        <div className="relative aspect-[13/12]">
+          <div className="absolute inset-0 rounded-[50cqw_50cqw_28px_28px] bg-marigold-400" />
+          <div className="absolute inset-4 flex items-center justify-center overflow-hidden rounded-[calc(50cqw_-_16px)_calc(50cqw_-_16px)_16px_16px] bg-photo-bg">
+            {admin.photo_url ? (
+              // Plain <img>: a Supabase Storage URL unknown at build time,
+              // so next/image's loader adds nothing.
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={admin.photo_url}
+                alt={admin.name}
+                className="h-full w-full object-cover"
+                loading="eager"
+                decoding="async"
+              />
+            ) : (
+              <span className="font-display text-7xl text-neutral-500">{initials(admin.name)}</span>
+            )}
+          </div>
+          <div className="absolute -left-3 bottom-7 flex h-24 w-24 items-center justify-center rounded-full bg-surface-muted shadow-lg sm:-left-9 sm:h-[124px] sm:w-[124px]">
+            <MarigoldFlower className="h-[77%] w-[77%]" />
+          </div>
+        </div>
       </div>
     </section>
   );
 }
 
 const STEPS = [
-  { icon: MousePointerClick, title: "Pick a session", body: "Choose what you'd like to talk about." },
-  { icon: CalendarCheck, title: "Grab a slot", body: "Times are shown in your own timezone." },
-  { icon: Video, title: "Hop on the call", body: "Your Google Meet link lands on email and WhatsApp." },
+  { title: "Pick a session", body: "Choose what you'd like to talk about." },
+  { title: "Grab a slot", body: "Times show in your own timezone." },
+  { title: "Hop on the call", body: "Your Google Meet link lands on email and WhatsApp." },
 ];
 
 export function HowItWorks() {
   return (
-    <section>
-      <SectionHeading eyebrow="How it works" title="Three steps, zero fuss" />
-      <ol className="grid gap-3 sm:grid-cols-3">
-        {STEPS.map(({ icon: Icon, title, body }, i) => (
-          <li key={title} className="rounded-3xl border border-border bg-surface p-5">
-            <div className="flex items-center justify-between">
-              <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-brand-50 text-brand-600">
-                <Icon className="h-5 w-5" />
-              </span>
-              <span className="font-display text-3xl font-semibold text-neutral-200">0{i + 1}</span>
-            </div>
-            <p className="mt-4 font-semibold text-neutral-900">{title}</p>
-            <p className="mt-1 text-sm leading-relaxed text-neutral-500">{body}</p>
-          </li>
-        ))}
-      </ol>
-    </section>
-  );
-}
-
-export function FaqList({ items }: { items: NonNullable<ProfileShowcase["faqs"]> }) {
-  return (
-    <section>
-      <SectionHeading eyebrow="FAQ" title="Good questions" />
-      <div className="divide-y divide-border overflow-hidden rounded-3xl border border-border bg-surface">
-        {items.map((f) => (
-          // Native <details>: accessible, keyboard-friendly and works with
-          // no client JS on an otherwise server-rendered page.
-          <details key={f.question} className="group px-6 [&_summary::-webkit-details-marker]:hidden">
-            <summary className="flex cursor-pointer list-none items-center justify-between gap-4 py-5 font-medium text-neutral-900">
-              {f.question}
-              <ChevronDown className="h-4 w-4 shrink-0 text-neutral-400 transition-transform group-open:rotate-180" />
-            </summary>
-            <p className="-mt-1 pb-5 text-sm leading-relaxed text-neutral-600">{f.answer}</p>
-          </details>
-        ))}
-      </div>
-    </section>
+    <ol aria-label="How booking works" className="grid gap-6 md:grid-cols-3 md:gap-8">
+      {STEPS.map(({ title, body }, i) => (
+        <li key={title} className="flex items-start gap-[18px]">
+          <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-marigold-400 font-display text-[22px] text-brand-900">
+            {i + 1}
+          </span>
+          <div className="flex flex-col gap-1">
+            <span className="text-[19px] font-bold text-brand-700">{title}</span>
+            <span className="text-base text-neutral-700">{body}</span>
+          </div>
+        </li>
+      ))}
+    </ol>
   );
 }

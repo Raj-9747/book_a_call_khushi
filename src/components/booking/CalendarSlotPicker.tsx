@@ -88,7 +88,7 @@ export function CalendarSlotPicker({
         {/* Calendar */}
         <div>
           <div className="flex items-center justify-between">
-            <p className="font-display text-lg font-semibold text-neutral-900">
+            <p className="font-display text-xl text-brand-700">
               {formatInTimeZone(start, "UTC", "MMMM yyyy")}
             </p>
             <div className="flex gap-1">
